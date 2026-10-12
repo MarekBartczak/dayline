@@ -11,14 +11,27 @@ export default class DaylinePreferences extends ExtensionPreferences {
         const settings = this.getSettings();
         const page = new Adw.PreferencesPage({title: 'Dayline', icon_name: 'view-calendar-symbolic'});
         window.add(page);
-        const appearanceGroup = new Adw.PreferencesGroup({title: 'Twój spokojniejszy dzień', description: 'Zadania i notatki zawsze pod ręką, w górnym pasku GNOME.'});
+        const appearanceGroup = new Adw.PreferencesGroup({title: 'Appearance', description: 'Tasks and notes always close at hand, in the GNOME top bar.'});
         page.add(appearanceGroup);
         const values = ['system', 'light', 'dark'];
-        const appearance = new Adw.ComboRow({title: 'Wygląd panelu', model: Gtk.StringList.new(['Zgodny z systemem', 'Jasny', 'Ciemny']), selected: Math.max(0, values.indexOf(settings.get_string('appearance')))});
+        const appearance = new Adw.ComboRow({title: 'Panel appearance', model: Gtk.StringList.new(['Follow system', 'Light', 'Dark']), selected: Math.max(0, values.indexOf(settings.get_string('appearance')))});
         appearance.connect('notify::selected', () => settings.set_string('appearance', values[appearance.selected]));
         appearanceGroup.add(appearance);
 
-        const backups = new Adw.PreferencesGroup({title: 'Dane i kopie zapasowe', description: 'Wszystko jest zapisane lokalnie. Kopia zawiera zadania i notatki.'});
+        const accents = ['system', 'ubuntu', 'violet', 'blue', 'green', 'rose'];
+        const accent = new Adw.ComboRow({title: 'Accent color', model: Gtk.StringList.new(['System accent', 'Ubuntu Orange', 'Violet', 'Blue', 'Green', 'Rose']), selected: Math.max(0, accents.indexOf(settings.get_string('accent')))});
+        accent.connect('notify::selected', () => settings.set_string('accent', accents[accent.selected]));
+        appearanceGroup.add(accent);
+
+        const opacity = new Adw.SpinRow({title: 'Background opacity', subtitle: '20–100%. Text stays fully readable.', adjustment: new Gtk.Adjustment({lower: 20, upper: 100, step_increment: 5, page_increment: 10}), digits: 0});
+        settings.bind('opacity', opacity, 'value', Gio.SettingsBindFlags.DEFAULT);
+        appearanceGroup.add(opacity);
+
+        const compact = new Adw.SwitchRow({title: 'Compact layout', subtitle: 'Use a smaller panel with tighter spacing.'});
+        settings.bind('compact', compact, 'active', Gio.SettingsBindFlags.DEFAULT);
+        appearanceGroup.add(compact);
+
+        const backups = new Adw.PreferencesGroup({title: 'Data and backups', description: 'Everything is saved locally. Backups contain your tasks and notes.'});
         page.add(backups);
         const action = (title, subtitle, icon, callback) => {
             const row = new Adw.ActionRow({title, subtitle, activatable: true});
@@ -27,29 +40,35 @@ export default class DaylinePreferences extends ExtensionPreferences {
             row.connect('activated', callback);
             backups.add(row);
         };
-        const errorDialog = error => new Adw.AlertDialog({heading: 'Nie udało się wykonać operacji', body: error.message}).present(window);
+        const errorDialog = error => {
+            const dialog = new Adw.AlertDialog({heading: 'Unable to complete the operation', body: error.message});
+            dialog.add_response('close', 'Close');
+            dialog.set_default_response('close');
+            dialog.set_close_response('close');
+            dialog.present(window);
+        };
         const filters = new Gio.ListStore({item_type: Gtk.FileFilter});
-        const json = new Gtk.FileFilter({name: 'Kopia Dayline (.json)'});
+        const json = new Gtk.FileFilter({name: 'Dayline backup (.json)'});
         json.add_pattern('*.json');
         filters.append(json);
-        action('Eksportuj kopię', 'Zapisz wszystkie zadania i notatki do pliku JSON.', 'document-save-symbolic', () => {
+        action('Export backup', 'Save all tasks and notes to a JSON file.', 'document-save-symbolic', () => {
             const store = new Store();
             if (store.error) { errorDialog(new Error(store.error)); return; }
-            const dialog = new Gtk.FileDialog({title: 'Eksportuj kopię Dayline', initial_name: `dayline-${new Date().toISOString().slice(0, 10)}.json`, filters});
+            const dialog = new Gtk.FileDialog({title: 'Export Dayline backup', initial_name: `dayline-${new Date().toISOString().slice(0, 10)}.json`, filters});
             dialog.save(window, null, (source, result) => {
                 try { writeDocument(source.save_finish(result), store.data); }
                 catch (error) { if (!error.matches?.(Gtk.DialogError, Gtk.DialogError.DISMISSED)) errorDialog(error); }
             });
         });
-        action('Importuj lub przywróć kopię', 'Zastąp listę kopią. Obecne dane zachowamy jako backup.', 'document-open-symbolic', () => {
-            const picker = new Gtk.FileDialog({title: 'Importuj kopię Dayline', filters});
+        action('Import or restore backup', 'Replace your list with a backup. Your current data will be preserved.', 'document-open-symbolic', () => {
+            const picker = new Gtk.FileDialog({title: 'Import Dayline backup', filters});
             picker.open(window, null, (source, result) => {
                 let document;
                 try { document = readDocument(source.open_finish(result)); }
                 catch (error) { if (!error.matches?.(Gtk.DialogError, Gtk.DialogError.DISMISSED)) errorDialog(error); return; }
-                const confirm = new Adw.AlertDialog({heading: 'Przywrócić tę kopię?', body: `Kopia zawiera ${document.tasks.length} zadań i ${document.notes.length} notatek. Zastąpi obecną listę. Poprzedni plik zachowamy obok danych.`});
-                confirm.add_response('cancel', 'Anuluj');
-                confirm.add_response('restore', 'Przywróć kopię');
+                const confirm = new Adw.AlertDialog({heading: 'Restore this backup?', body: `This backup contains ${document.tasks.length} tasks and ${document.notes.length} notes. It will replace your current list. Your previous file will be preserved in the data folder.`});
+                confirm.add_response('cancel', 'Cancel');
+                confirm.add_response('restore', 'Restore backup');
                 confirm.set_response_appearance('restore', Adw.ResponseAppearance.DESTRUCTIVE);
                 confirm.set_default_response('cancel');
                 confirm.set_close_response('cancel');
@@ -60,15 +79,15 @@ export default class DaylinePreferences extends ExtensionPreferences {
                 });
             });
         });
-        action('Otwórz katalog danych', dataPath(), 'folder-open-symbolic', () => {
+        action('Open data folder', dataPath(), 'folder-open-symbolic', () => {
             const directory = Gio.File.new_for_path(dataPath()).get_parent();
             GLib.mkdir_with_parents(directory.get_path(), 0o700);
             Gtk.FileLauncher.new(directory).launch(window, null, (source, result) => {
                 try { source.launch_finish(result); } catch (error) { errorDialog(error); }
             });
         });
-        const info = new Adw.PreferencesGroup({title: 'Małe narzędzie. Więcej miejsca w głowie.'});
-        info.add(new Adw.ActionRow({title: 'Dayline 0.1.0', subtitle: 'Licznik obejmuje wyłącznie niezrobione zadania na dziś.\nZaległe zadania znajdziesz w osobnej sekcji.'}));
+        const info = new Adw.PreferencesGroup({title: 'A small tool. A clearer mind.'});
+        info.add(new Adw.ActionRow({title: 'Dayline 0.2.0', subtitle: 'The counter includes only unfinished tasks for today.\nOverdue tasks appear in their own section.'}));
         page.add(info);
     }
 }

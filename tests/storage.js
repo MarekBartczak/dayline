@@ -1,7 +1,7 @@
 import GLib from 'gi://GLib';
 import Gio from 'gi://Gio';
 import {Store} from '../store.js';
-import {addTask, emptyDocument} from '../model.js';
+import {addTask, emptyDocument, updateTask} from '../model.js';
 
 function assert(condition, message) {
     if (!condition)
@@ -41,12 +41,33 @@ try {
     assert(!corrupt.error && new Store(path).data.tasks.length === 1, 'Explicit restore must recover store');
     const [, corruptBytes] = Gio.File.new_for_path(`${path}.corrupt`).load_contents(null);
     assert(new TextDecoder().decode(corruptBytes) === '{broken', 'Restore must preserve corrupt original');
+    const legacy = {version: 1, tasks: [
+        {id: 'legacy', text: 'Original task', date: '2026-10-12', done: false, createdAt: '2026-10-12T08:00:00.000Z'},
+        {id: 'completed', text: 'Already done', date: '2026-10-11', done: true, createdAt: '2026-10-11T08:00:00.000Z'},
+    ], notes: [{id: 'legacy-note', text: 'Original\nnotes', createdAt: '2026-10-12T08:00:00.000Z'}]};
+    const legacyContents = JSON.stringify(legacy, null, 4) + '\n';
+    file.replace_contents(legacyContents, null, false, Gio.FileCreateFlags.PRIVATE, null);
+    const migrated = new Store(path);
+    assert(!migrated.error && migrated.data.version === 2, 'Existing v1 data must load as canonical v2');
+    assert(migrated.data.tasks.every(task => task.inProgress === false), 'Migration must preserve done tasks and default to waiting');
+    assert(migrated.data.tasks[1].done && migrated.data.notes[0].text === legacy.notes[0].text, 'Migration must preserve task status and notes');
+    migrated.save(updateTask(migrated.data, 'legacy', {inProgress: true}));
+    const [, migratedBytes] = file.load_contents(null);
+    const onDisk = JSON.parse(new TextDecoder().decode(migratedBytes));
+    assert(onDisk.version === 2 && onDisk.tasks[0].inProgress, 'Saving migrated data must persist v2 task status');
+    assert(new Store(path).data.tasks[0].inProgress, 'In-progress status must survive reload');
+    const [, legacyBackupBytes] = Gio.File.new_for_path(`${path}.bak`).load_contents(null);
+    assert(new TextDecoder().decode(legacyBackupBytes) === legacyContents, 'Migration save must retain original v1 bytes in backup');
+    file.replace_contents(legacyContents, null, false, Gio.FileCreateFlags.PRIVATE, null);
+    new Store(path).restore(first);
+    const [, restoreBackupBytes] = Gio.File.new_for_path(`${path}.bak`).load_contents(null);
+    assert(new TextDecoder().decode(restoreBackupBytes) === legacyContents, 'Restore must also retain original valid v1 bytes');
     // A regular file as parent guarantees ENOTDIR even when tests run as root.
     const blocked = new Store(`${path}/blocked.json`);
     failed = false;
     try { blocked.save(first); } catch { failed = true; }
     assert(failed && blocked.data.tasks.length === 0, 'Failed save cannot update model');
-    print('PASS: real GIO storage, backup, corruption recovery and failed-save rollback');
+    print('PASS: real GIO storage, v1 migration, original backups, status persistence, size limits and corruption recovery');
 } finally {
     for (const name of ['data.json', 'data.json.bak', 'data.json.corrupt']) {
         const entry = Gio.File.new_for_path(GLib.build_filenamev([directory, name]));

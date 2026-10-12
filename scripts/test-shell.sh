@@ -10,5 +10,5 @@ XDG_DATA_HOME="$runtime_dir/data" XDG_CACHE_HOME="$runtime_dir/cache" \
 GIO_USE_VFS=local GSETTINGS_BACKEND=keyfile \
 SHELL_BACKGROUND_IMAGE="$project_dir/tests/background.svg" \
 timeout 60s dbus-run-session -- gnome-shell-test-tool --headless \
-    --extension "$project_dir/dist/dayline@marekbartczak.github.io.shell-extension.zip" \
-    "$project_dir/tests/shell.js"
+    --extension "${DAYLINE_TEST_EXTENSION:-$project_dir/dist/dayline@marekbartczak.github.io.shell-extension.zip}" \
+    "${DAYLINE_TEST_SCRIPT:-$project_dir/tests/shell.js}"

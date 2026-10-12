@@ -6,5 +6,20 @@
       <default>'system'</default>
       <summary>Popup appearance</summary>
     </key>
+    <key name="accent" type="s">
+      <choices><choice value="system"/><choice value="ubuntu"/><choice value="violet"/><choice value="blue"/><choice value="green"/><choice value="rose"/></choices>
+      <default>'ubuntu'</default>
+      <summary>Popup accent color</summary>
+    </key>
+    <key name="opacity" type="i">
+      <range min="20" max="100"/>
+      <default>100</default>
+      <summary>Popup background opacity in percent</summary>
+      <description>Only the panel background changes opacity; text and controls remain fully readable.</description>
+    </key>
+    <key name="compact" type="b">
+      <default>true</default>
+      <summary>Use a compact popup layout</summary>
+    </key>
   </schema>
 </schemalist>

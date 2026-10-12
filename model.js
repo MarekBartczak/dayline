@@ -17,7 +17,7 @@ export function isDate(value) {
 
 export function parseDate(value) {
     if (!isDate(value))
-        throw new Error('Wybierz prawidłową datę (RRRR-MM-DD).');
+        throw new Error('Choose a valid date (YYYY-MM-DD).');
     const [year, month, day] = value.split('-').map(Number);
     return new Date(year, month - 1, day, 12);
 }
@@ -27,7 +27,7 @@ export function shiftDate(value, days) {
     date.setDate(date.getDate() + days);
     const result = localDate(date);
     if (!isDate(result))
-        throw new Error('Data poza obsługiwanym zakresem.');
+        throw new Error('Date is outside the supported range.');
     return result;
 }
 
@@ -37,7 +37,7 @@ export function shiftMonth(value, months) {
     date.setMonth(date.getMonth() + months);
     const result = localDate(date);
     if (!isDate(result))
-        throw new Error('Data poza obsługiwanym zakresem.');
+        throw new Error('Date is outside the supported range.');
     return result;
 }
 
@@ -49,58 +49,74 @@ export function monthDays(value) {
 }
 
 export function emptyDocument() {
-    return {version: 1, tasks: [], notes: []};
+    return {version: 2, tasks: [], notes: []};
 }
 
 function exactKeys(object, keys) {
     if (!object || typeof object !== 'object' || Array.isArray(object) ||
         Object.keys(object).length !== keys.length || keys.some(key => !Object.hasOwn(object, key)))
-        throw new Error('Nieprawidłowy format danych Dayline.');
+        throw new Error('Invalid Dayline data format.');
 }
 
 function cleanText(text, limit) {
     if (typeof text !== 'string' || !text.trim())
-        throw new Error('Wpisz treść przed zapisaniem.');
+        throw new Error('Enter text before saving.');
     if (text.length > limit)
-        throw new Error(`Treść może mieć najwyżej ${limit} znaków.`);
+        throw new Error(`Text must be no longer than ${limit} characters.`);
     return text.trim();
 }
 
 export function validateDocument(document) {
     exactKeys(document, ['version', 'tasks', 'notes']);
-    if (document.version !== 1 || !Array.isArray(document.tasks) || !Array.isArray(document.notes))
-        throw new Error('Nieobsługiwana wersja lub format pliku Dayline.');
+    if (![1, 2].includes(document.version) || !Array.isArray(document.tasks) || !Array.isArray(document.notes))
+        throw new Error('Unsupported Dayline file version or format.');
     if (document.tasks.length + document.notes.length > 10000)
-        throw new Error('Plik zawiera zbyt wiele wpisów (limit: 10 000).');
+        throw new Error('File contains too many entries (limit: 10,000).');
     const ids = new Set();
     const validate = (item, kind) => {
-        exactKeys(item, kind === 'tasks' ? ['id', 'text', 'date', 'done', 'createdAt'] : ['id', 'text', 'createdAt']);
+        const taskKeys = ['id', 'text', 'date', 'done', 'createdAt'];
+        if (document.version === 2)
+            taskKeys.push('inProgress');
+        exactKeys(item, kind === 'tasks' ? taskKeys : ['id', 'text', 'createdAt']);
         if (typeof item.id !== 'string' || !item.id || item.id.length > 128 || ids.has(item.id))
-            throw new Error('Nieprawidłowy lub powtórzony identyfikator wpisu.');
+            throw new Error('Invalid or duplicate entry ID.');
         ids.add(item.id);
         if (typeof item.createdAt !== 'string' || !/^\d{4}-\d{2}-\d{2}T/.test(item.createdAt) || !Number.isFinite(Date.parse(item.createdAt)))
-            throw new Error('Nieprawidłowa data utworzenia wpisu.');
+            throw new Error('Invalid entry creation date.');
         if (kind === 'tasks' && (!isDate(item.date) || typeof item.done !== 'boolean'))
-            throw new Error('Nieprawidłowa data lub status zadania.');
-        return {...item, text: cleanText(item.text, kind === 'tasks' ? MAX_TASK_TEXT : MAX_NOTE_TEXT)};
+            throw new Error('Invalid task date or status.');
+        if (kind === 'tasks' && document.version === 2 &&
+            (typeof item.inProgress !== 'boolean' || item.done && item.inProgress))
+            throw new Error('Invalid task status. Completed tasks cannot be in progress.');
+        // Validate existing text without altering data imported from either version.
+        cleanText(item.text, kind === 'tasks' ? MAX_TASK_TEXT : MAX_NOTE_TEXT);
+        return kind === 'tasks' ? {...item, inProgress: document.version === 1 ? false : item.inProgress} : {...item};
     };
-    return {version: 1, tasks: document.tasks.map(item => validate(item, 'tasks')), notes: document.notes.map(item => validate(item, 'notes'))};
+    return {version: 2, tasks: document.tasks.map(item => validate(item, 'tasks')), notes: document.notes.map(item => validate(item, 'notes'))};
 }
 
 export function addTask(data, item) {
-    return validateDocument({...data, tasks: [...data.tasks, {...item, done: false}]});
+    const document = validateDocument(data);
+    return validateDocument({...document, tasks: [...document.tasks, {...item, text: cleanText(item.text, MAX_TASK_TEXT), done: false, inProgress: false}]});
 }
 
 export function addNote(data, item) {
-    return validateDocument({...data, notes: [...data.notes, item]});
+    const document = validateDocument(data);
+    return validateDocument({...document, notes: [...document.notes, {...item, text: cleanText(item.text, MAX_NOTE_TEXT)}]});
 }
 
 function update(data, kind, id, patch) {
+    data = validateDocument(data);
     if (!data[kind].some(item => item.id === id))
-        throw new Error('Ten wpis już nie istnieje.');
-    const allowed = kind === 'tasks' ? ['text', 'date', 'done'] : ['text'];
+        throw new Error('This entry no longer exists.');
+    const allowed = kind === 'tasks' ? ['text', 'date', 'done', 'inProgress'] : ['text'];
     if (Object.keys(patch).some(key => !allowed.includes(key)))
-        throw new Error('Nieprawidłowe pola aktualizacji.');
+        throw new Error('Invalid update fields.');
+    patch = {...patch};
+    if (Object.hasOwn(patch, 'text'))
+        patch.text = cleanText(patch.text, kind === 'tasks' ? MAX_TASK_TEXT : MAX_NOTE_TEXT);
+    if (kind === 'tasks' && patch.done === true)
+        patch.inProgress = false;
     return validateDocument({...data, [kind]: data[kind].map(item => item.id === id ? {...item, ...patch} : item)});
 }
 
@@ -109,19 +125,22 @@ export const updateNote = (data, id, patch) => update(data, 'notes', id, patch);
 
 export function removeItem(data, kind, id) {
     if (!['tasks', 'notes'].includes(kind))
-        throw new Error('Nieprawidłowy rodzaj wpisu.');
+        throw new Error('Invalid entry type.');
+    data = validateDocument(data);
     return validateDocument({...data, [kind]: data[kind].filter(item => item.id !== id)});
 }
 
 export function restoreItem(data, kind, item) {
     if (!['tasks', 'notes'].includes(kind))
-        throw new Error('Nieprawidłowy rodzaj wpisu.');
+        throw new Error('Invalid entry type.');
+    data = validateDocument(data);
     return validateDocument({...data, [kind]: [...data[kind], item]});
 }
 
 export function tasksForDate(data, date) {
+    const statusOrder = task => task.done ? 2 : task.inProgress ? 0 : 1;
     return data.tasks.filter(item => item.date === date)
-        .sort((a, b) => Number(a.done) - Number(b.done) || a.createdAt.localeCompare(b.createdAt));
+        .sort((a, b) => statusOrder(a) - statusOrder(b) || a.createdAt.localeCompare(b.createdAt));
 }
 
 export function overdueTasks(data, today = localDate()) {
@@ -132,5 +151,7 @@ export function overdueTasks(data, today = localDate()) {
 export function todaySummary(data, today = localDate()) {
     const tasks = tasksForDate(data, today);
     const done = tasks.filter(item => item.done).length;
-    return {remaining: tasks.length - done, total: tasks.length, done};
+    const inProgress = tasks.filter(item => !item.done && item.inProgress).length;
+    const remaining = tasks.length - done;
+    return {remaining, total: tasks.length, done, inProgress, waiting: remaining - inProgress};
 }

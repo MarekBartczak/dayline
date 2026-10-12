@@ -6,16 +6,16 @@ import {box, label, button, iconButton, formatDate} from './widgets.js';
 export function calendar(selected, data, onSelect, onMonth) {
     const root = box(true, 'dayline-calendar');
     const header = box(false, 'dayline-calendar-header');
-    header.add_child(iconButton('Poprzedni miesiąc', 'go-previous-symbolic', () => onMonth(shiftMonth(selected, -1))));
+    header.add_child(iconButton('Previous month', 'go-previous-symbolic', () => onMonth(shiftMonth(selected, -1))));
     const title = label(formatDate(selected, {month: 'long', year: 'numeric'}), 'dayline-calendar-title');
     title.x_expand = true;
     title.x_align = Clutter.ActorAlign.CENTER;
     header.add_child(title);
-    header.add_child(iconButton('Następny miesiąc', 'go-next-symbolic', () => onMonth(shiftMonth(selected, 1))));
+    header.add_child(iconButton('Next month', 'go-next-symbolic', () => onMonth(shiftMonth(selected, 1))));
     root.add_child(header);
     const grid = new St.Widget({layout_manager: new Clutter.GridLayout({orientation: Clutter.Orientation.HORIZONTAL}), x_expand: true});
     const layout = grid.layout_manager;
-    ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So', 'Nd'].forEach((name, index) => {
+    ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].forEach((name, index) => {
         const day = label(name, 'dayline-weekday');
         day.x_expand = true;
         day.x_align = Clutter.ActorAlign.CENTER;

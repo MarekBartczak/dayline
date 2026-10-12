@@ -28,7 +28,11 @@ export function button(text, callback, style = 'dayline-button', icon = null) {
     return actor;
 }
 
-export const iconButton = (name, icon, callback, extra = '') => button(name, callback, `dayline-icon-button ${extra}`, icon);
+export function iconButton(name, icon, callback, extra = '') {
+    const actor = button(name, callback, `dayline-icon-button ${extra}`, icon);
+    actor.y_align = Clutter.ActorAlign.CENTER;
+    return actor;
+}
 
 export function sectionHeading(text, count = null) {
     const row = box(false, 'dayline-section-heading');
@@ -48,5 +52,5 @@ export function emptyState(icon, title, description) {
 
 export function formatDate(date, options = {day: 'numeric', month: 'long'}) {
     const [year, month, day] = date.split('-').map(Number);
-    return new Date(year, month - 1, day, 12).toLocaleDateString('pl-PL', options);
+    return new Date(year, month - 1, day, 12).toLocaleDateString('en-GB', options);
 }
