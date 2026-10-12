@@ -16,7 +16,7 @@ See how many tasks are left **today** without opening an app. Click to plan a da
 - **Calendar** — a Monday-first month grid; choose any day and add tasks there. Dots indicate days with unfinished tasks.
 - **Notes** — undated notes for ideas, reminders, and details to add to a project.
 - **Private** — a fourth tab for encrypted notes, protected by a separate password and automatically locked when the panel closes or the screen locks.
-- **Edit and reschedule** — click a task or note; the editor supports multiple lines and a date picker.
+- **Edit and reschedule** — click a task or note; task descriptions support up to 50,000 characters with internal scrolling, multiple lines, and a date picker.
 - **Expanded entry** — overlapping rectangles on a task or ordinary note turn the same popup into a wider editor for that entry. Back restores the compact list and retains an unfinished draft in the session; Save updates only that entry. Pin stays unchanged.
 - **Delete with undo** — restore the last deleted task or ordinary note while the extension remains enabled.
 - **Pin to screen** — keep the panel visible while working in other apps. Copy elsewhere, return and paste without losing your editor.
@@ -93,7 +93,7 @@ Default location: `~/.local/share/dayline/data.json`, or `$XDG_DATA_HOME/dayline
 
 Each save keeps the previous valid document in `data.json.bak`. Import validates the whole backup and asks before replacing your list. If a file cannot be read, Dayline preserves it and blocks edits; restore a valid JSON backup through preferences. A corrupt original is retained as `data.json.corrupt` during recovery.
 
-Backups use a versioned JSON document containing `tasks` and `notes`. Version 2 adds `inProgress`; original version 1 data/backups migrate automatically, preserving text, IDs, dates and completion status. The previous file is backed up byte for byte on the next save. Limits: 10,000 entries, 2,000 characters per task, 10,000 per note, and 32 MiB serialized UTF-8. Oversized writes are rejected before the current file or its backup is changed. Dayline is intended for one local desktop; it does not implement cross-device synchronization.
+Backups use a versioned JSON document containing `tasks` and `notes`. Version 2 adds `inProgress`; original version 1 data/backups migrate automatically, preserving text, IDs, dates and completion status. The previous file is backed up byte for byte on the next save. Limits: 10,000 entries, 50,000 characters per task, 10,000 per note, and 32 MiB serialized UTF-8. Oversized writes are rejected before the current file or its backup is changed. Dayline is intended for one local desktop; it does not implement cross-device synchronization.
 
 Private notes live separately in `~/.local/share/dayline/private-notes.vault`, or `$XDG_DATA_HOME/dayline/private-notes.vault`. The vault uses AES-256-GCM authenticated encryption and derives its key from your password with scrypt (`N=131072`, `r=8`, `p=1`). This password is independent of your system login. **There is no password recovery**: keep the password if you want to retain access to the notes. Closing the panel or locking the screen locks the vault; switching pin mode preserves the unlocked vault until the panel actually closes. Ordinary JSON exports and imports contain only tasks and ordinary notes; they exclude Private notes. To back up the vault, copy the encrypted `private-notes.vault` file separately and retain its password.
 
@@ -105,6 +105,7 @@ bash scripts/test-shell.sh  # Actual isolated GNOME Shell 50 UI/lifecycle test
 DAYLINE_TEST_SCRIPT="$PWD/tests/privateShell.js" bash scripts/test-shell.sh # Private tab lifecycle
 DAYLINE_TEST_SCRIPT="$PWD/tests/singlePanel.js" bash scripts/test-shell.sh # Single-panel transitions, opacity and gutters
 DAYLINE_TEST_SCRIPT="$PWD/tests/pointerInput.js" bash scripts/test-shell.sh # Real pointer controls and animation races
+DAYLINE_TEST_SCRIPT="$PWD/tests/longEditor.js" bash scripts/test-shell.sh # Internal scrolling, caret and 50k task text
 ```
 
 The first command needs Node.js 22+, GJS and system Python 3 with `cryptography`. The Shell test also needs `gnome-shell-test-tool` from GNOME 50. It uses temporary XDG data, settings, and runtime directories, and synthetic examples. It does not touch your Dayline list or desktop extension settings.

@@ -1,6 +1,7 @@
 import St from 'gi://St';
 import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
+import GLib from 'gi://GLib';
 import Pango from 'gi://Pango';
 import {localDate, shiftDate, MAX_TASK_TEXT, MAX_NOTE_TEXT} from '../model.js';
 import {box, label, button, iconButton} from './widgets.js';
@@ -25,11 +26,41 @@ export function editor(kind, item, initialText, initialDate, data, onSave, onCan
     text.clutter_text.line_wrap = true;
     text.clutter_text.line_wrap_mode = Pango.WrapMode.WORD_CHAR;
     text.clutter_text.max_length = kind === 'notes' ? MAX_NOTE_TEXT : MAX_TASK_TEXT;
-    const field = new St.ScrollView({style_class: 'dayline-editor-field', x_expand: true, overlay_scrollbars: true, hscrollbar_policy: St.PolicyType.NEVER, vscrollbar_policy: St.PolicyType.AUTOMATIC});
+    const field = new St.ScrollView({style_class: 'dayline-editor-field dayline-textarea', x_expand: true, overlay_scrollbars: true, hscrollbar_policy: St.PolicyType.NEVER, vscrollbar_policy: St.PolicyType.AUTOMATIC});
     const fieldContent = box(true);
     fieldContent.add_child(text);
     field.set_child(fieldContent);
     root.add_child(field);
+    let revealSource = 0;
+    let destroyed = false;
+    const revealCaret = () => {
+        if (destroyed || revealSource) return;
+        revealSource = GLib.idle_add(GLib.PRIORITY_LOW, () => {
+            revealSource = 0;
+            if (destroyed || !text.clutter_text.has_key_focus()) return GLib.SOURCE_REMOVE;
+            const [valid, , y, lineHeight] = text.clutter_text.position_to_coords(text.clutter_text.cursor_position);
+            if (!valid) return GLib.SOURCE_REMOVE;
+            const adjustment = field.vadjustment;
+            const padding = 12 * St.ThemeContext.get_for_stage(global.stage).scale_factor;
+            if (y < adjustment.value) adjustment.value = y;
+            else if (y + lineHeight + padding * 2 > adjustment.value + adjustment.page_size)
+                adjustment.value = y + lineHeight + padding * 2 - adjustment.page_size;
+            return GLib.SOURCE_REMOVE;
+        });
+    };
+    field.connect('notify::height', revealCaret);
+    const focusIn = text.clutter_text.connect('key-focus-in', () => {
+        field.add_style_pseudo_class('focus');
+        revealCaret();
+    });
+    const focusOut = text.clutter_text.connect('key-focus-out', () => field.remove_style_pseudo_class('focus'));
+    field.connect('destroy', () => {
+        destroyed = true;
+        if (revealSource) GLib.Source.remove(revealSource);
+        revealSource = 0;
+        text.clutter_text.disconnect(focusIn);
+        text.clutter_text.disconnect(focusOut);
+    });
     let expanded = false;
     let heightLimit = 190;
     const measure = () => {
@@ -37,19 +68,15 @@ export function editor(kind, item, initialText, initialDate, data, onSave, onCan
         const width = Math.max(180 * scale, text.width - 24 * scale);
         const [, natural] = text.clutter_text.get_preferred_height(width);
         const height = Math.max(expanded ? Math.min(240, heightLimit) : 105, Math.ceil(natural / scale) + 26);
-        text.set_style(`min-height: 0px; padding-top: 12px; padding-bottom: ${Math.max(12, height - natural / scale - 12)}px;`);
-        field.set_style(`height: ${Math.min(heightLimit, Math.max(expanded ? Math.min(240, heightLimit) : 105, height))}px;`);
+        // Keep the entire document at its natural height. Only the surrounding
+        // ScrollView is bounded; shrinking this Entry clips text before scrolling.
+        text.set_style(`min-height: ${height}px; padding: 12px; border-width: 0px; border-radius: 0px; background-color: transparent;`);
+        field.set_style(`height: ${Math.min(heightLimit, Math.max(expanded ? Math.min(240, heightLimit) : 105, height))}px; min-height: 0px; padding: 0px;`);
     };
     text.connect('notify::width', measure);
-    text.clutter_text.connect('text-changed', measure);
-    text.clutter_text.connect('notify::cursor-position', () => {
-        const [valid, , y, lineHeight] = text.clutter_text.position_to_coords(text.clutter_text.cursor_position);
-        if (!valid) return;
-        const adjustment = field.vadjustment;
-        if (y < adjustment.value) adjustment.value = y;
-        else if (y + lineHeight + 26 * St.ThemeContext.get_for_stage(global.stage).scale_factor > adjustment.value + field.height)
-            adjustment.value = y + lineHeight + 26 * St.ThemeContext.get_for_stage(global.stage).scale_factor - field.height;
-    });
+    text.connect('notify::height', revealCaret);
+    text.clutter_text.connect('text-changed', () => { measure(); revealCaret(); });
+    text.clutter_text.connect('notify::cursor-position', revealCaret);
     let date = null;
     if (kind === 'tasks') {
         root.add_child(label('SCHEDULED FOR', 'dayline-caption'));

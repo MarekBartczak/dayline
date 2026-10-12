@@ -1,5 +1,5 @@
 // Pure domain logic shared by GNOME Shell, preferences and Node tests.
-export const MAX_TASK_TEXT = 2000;
+export const MAX_TASK_TEXT = 50000;
 export const MAX_NOTE_TEXT = 10000;
 const pad = number => String(number).padStart(2, '0');
 

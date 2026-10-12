@@ -56,6 +56,15 @@ test('task CRUD is immutable, trims text, supports reopen and reschedule', () =>
     assert.throws(() => m.addTask(added, {id: 'a', text: 'duplicate', date: '2026-10-12', createdAt: timestamp}));
 });
 
+test('long tasks preserve complete text when added, edited and reloaded', () => {
+    const text = 'Integration detail.\n'.repeat(2000);
+    const added = m.addTask(empty(), {id: 'long', text, date: '2026-10-12', createdAt: timestamp});
+    const changed = `${text}End of the description.`;
+    const edited = m.updateTask(added, 'long', {text: changed});
+    assert.equal(m.validateDocument(JSON.parse(JSON.stringify(edited))).tasks[0].text, changed);
+    assert.throws(() => m.updateTask(edited, 'long', {text: 'x'.repeat(m.MAX_TASK_TEXT + 1)}));
+});
+
 test('notes preserve literal markup and multiline text without a task date', () => {
     const data = m.addNote(empty(), {id: 'note', text: '<b>Not markup</b>\nSecond line', createdAt: timestamp});
     assert.equal(data.notes[0].text, '<b>Not markup</b>\nSecond line');

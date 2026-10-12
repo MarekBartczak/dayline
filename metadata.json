@@ -3,8 +3,8 @@
   "name": "Dayline",
   "description": "Your day, a little clearer. Today's task count, a calendar and quick notes in the GNOME top bar.",
   "shell-version": ["50"],
-  "version": 6,
-  "version-name": "0.2.4",
+  "version": 7,
+  "version-name": "0.2.5",
   "url": "https://github.com/MarekBartczak/dayline",
   "settings-schema": "org.gnome.shell.extensions.dayline"
 }
