@@ -17,12 +17,12 @@ See how many tasks are left **today** without opening an app. Click to plan a da
 - **Notes** — undated notes for ideas, reminders, and details to add to a project.
 - **Private** — a fourth tab for encrypted notes, protected by a separate password and automatically locked when the panel closes or the screen locks.
 - **Edit and reschedule** — click a task or note; the editor supports multiple lines and a date picker.
-- **Separate entry window** — overlapping rectangles on a task or ordinary note open only that entry in a floating editor, with its own pin, close button and size toggle. The main list keeps its size; closing retains an unfinished draft for reopening in the same session.
+- **Expanded entry** — overlapping rectangles on a task or ordinary note turn the same popup into a wider editor for that entry. Back restores the compact list and retains an unfinished draft in the session; Save updates only that entry. Pin stays unchanged.
 - **Delete with undo** — restore the last deleted task or ordinary note while the extension remains enabled.
 - **Pin to screen** — keep the panel visible while working in other apps. Copy elsewhere, return and paste without losing your editor.
 - **Compact by default** — overlapping rectangles in the editor smoothly switch to a larger workspace, preserving text and pin state.
 - **Light, dark, or system appearance**, with System accent, Ubuntu Orange, Violet, Blue, Green and Rose.
-- **Window opacity** — adjustable from 20–100% in Settings; the entire popup fades uniformly, including its cards, text and controls. Separate entry windows use the same setting.
+- **Window opacity** — adjustable from 20–100% in Settings; the entire popup fades uniformly, including its cards, text and controls. The list and editor use the same setting.
 - **Offline storage**, atomic saves, previous-version backup, and explicit JSON import/export.
 
 No account, server, network requests, tracking, or runtime npm dependencies. The interface is in **English**. Your own task and note text is kept exactly as you wrote it. GNOME **50** is the supported and tested version; other Shell versions are not declared compatible.
@@ -64,7 +64,7 @@ sudo apt-get install python3-cryptography
 6. Click an entry to edit it. The pencil beside the input opens a larger editor for a new entry. **Ctrl + Enter** saves; **Esc** leaves the editor.
 7. Click the pin beside the gear to keep the panel on screen. Unpin restores ordinary click-outside dismissal; the close button hides a pinned panel.
 8. In the editor, click the overlapping rectangles to expand or compact it.
-9. On a task or ordinary note card, click the overlapping rectangles to open a separate editor. Pin that window while copying from other apps; Save updates only that entry.
+9. On a task or ordinary note card, click the overlapping rectangles to expand the same panel into the selected editor. Pin the panel while copying from other apps; Back or Save restores the compact list.
 10. Click the play button on an unfinished task to mark it **In progress**; pause moves it back to waiting. The checkbox completes it.
 11. Open the gear menu for colors, window opacity, compact layout, and backups.
 
@@ -85,7 +85,7 @@ const updater = await import(GLib.filename_to_uri(GLib.build_filenamev([GLib.get
 await updater.activateUpdate(Main.extensionManager.lookup(u))
 ```
 
-Press Enter, then Esc. The update loads an immutable runtime snapshot with fresh module URLs, and can directly activate a previously disabled Dayline. Runtime switching preserves stored entries and any available composer/closed-window drafts. An open inline or separate editor blocks the switch; save or close it first. No unsafe-mode setting is needed.
+Press Enter, then Esc. The update loads an immutable runtime snapshot with fresh module URLs, and can directly activate a previously disabled Dayline. Runtime switching preserves stored entries and any available composer/entry drafts. An open editor blocks the switch; save or close it first. No unsafe-mode setting is needed.
 
 ## Your data
 
@@ -103,7 +103,7 @@ Private notes live separately in `~/.local/share/dayline/private-notes.vault`, o
 bash scripts/check.sh       # Domain, storage, encrypted vault, installer and syntax/schema checks
 bash scripts/test-shell.sh  # Actual isolated GNOME Shell 50 UI/lifecycle test
 DAYLINE_TEST_SCRIPT="$PWD/tests/privateShell.js" bash scripts/test-shell.sh # Private tab lifecycle
-DAYLINE_TEST_SCRIPT="$PWD/tests/entryWindows.js" bash scripts/test-shell.sh # Separate windows, opacity and gutters
+DAYLINE_TEST_SCRIPT="$PWD/tests/singlePanel.js" bash scripts/test-shell.sh # Single-panel transitions, opacity and gutters
 DAYLINE_TEST_SCRIPT="$PWD/tests/pointerInput.js" bash scripts/test-shell.sh # Real pointer controls and animation races
 ```
 

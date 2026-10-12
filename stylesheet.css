@@ -144,9 +144,6 @@
 .dayline-light .dayline-pin-hint { color: #786e89; }
 .dayline-pin-active { color: #e5dafb; background-color: #40364f; }
 .dayline-editor-field { border-radius: 10px; }
-.dayline-entry-window { border: 1px solid #393a4b; border-radius: 18px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35); }
-.dayline-detail-content { padding: 18px; spacing: 10px; }
-.dayline-detail-scroll { padding-right: 6px; }
 .dayline-compact .dayline-editor { spacing: 9px; }
 .dayline-compact .dayline-textarea { min-height: 105px; }
 

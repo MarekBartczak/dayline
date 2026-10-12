@@ -3,13 +3,14 @@ import Clutter from 'gi://Clutter';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as Scripting from 'resource:///org/gnome/shell/ui/scripting.js';
 import * as BoxPointer from 'resource:///org/gnome/shell/ui/boxpointer.js';
-import {createNativeTestWindow, copyNativeWindowText} from './nativeWindow.js';
+import {createNativeTestWindow, copyNativeWindowText, pasteIntoShellEntry} from './nativeWindow.js';
 import {shiftMonth} from '../model.js';
 import {formatDate} from '../ui/widgets.js';
 
 export const METRICS = {};
 function assert(value, message) { if (!value) throw new Error(`Pointer input: ${message}`); }
 function find(actor, name) {
+    if (!actor.visible) return null;
     if (actor.accessible_name === name) return actor;
     for (const child of actor.get_children()) { const match = find(child, name); if (match) return match; }
     return null;
@@ -37,6 +38,14 @@ async function activateFocused(actor) {
     keyboard.notify_keyval(time + 1, Clutter.KEY_space, Clutter.KeyState.RELEASED);
     await Scripting.sleep(200);
 }
+async function escapeFrom(actor) {
+    actor.grab_key_focus();
+    const keyboard = global.stage.context.get_backend().get_default_seat().create_virtual_device(Clutter.InputDeviceType.KEYBOARD_DEVICE);
+    const time = GLib.get_monotonic_time();
+    keyboard.notify_keyval(time, Clutter.KEY_Escape, Clutter.KeyState.PRESSED);
+    keyboard.notify_keyval(time + 1, Clutter.KEY_Escape, Clutter.KeyState.RELEASED);
+    await Scripting.sleep(220);
+}
 
 export async function run() {
     Main.overview.hide();
@@ -55,30 +64,47 @@ export async function run() {
     assert(app.store.data.tasks[0].inProgress, 'Real pointer click on Start must mark task in progress');
     await click(find(panel.menu.actor, `Complete: ${task.text}`));
     assert(app.store.data.tasks[0].done, 'Real pointer click on checkbox must complete task');
-    await click(find(panel.menu.actor, `Open task in separate window: ${task.text}`));
-    assert(panel.details, 'Real pointer click on row rectangles must open entry window');
-    await click(find(panel.details.actor, 'Expand editor'));
-    assert(panel.details.expanded, 'Unpinned entry controls must accept real pointer clicks');
-    await click(find(panel.details.actor, 'Compact editor'));
-    assert(!panel.details.expanded, 'Real pointer must collapse entry window');
-    await click(panel.details.editor.date);
-    assert(panel.details, 'Focusing the date field must keep the unpinned editor open');
-    await click(find(panel.details.actor, 'Choose a date'));
-    await click(find(panel.details.actor, 'Next month'));
-    assert(panel.details, 'Month navigation must keep the unpinned editor open');
-    await activateFocused(find(panel.details.actor, 'Next month'));
-    assert(panel.details, 'Keyboard month navigation must keep the unpinned editor open');
+    await click(find(panel.menu.actor, 'Pin panel'));
+    const popup = panel.menu.actor;
+    const chromeCount = Main.layoutManager._trackedActors.length;
+    await click(find(panel.menu.actor, `Expand task: ${task.text}`));
+    assert(panel.menu.isOpen && panel.menu.actor === popup && panel.editor && panel.expanded && !panel.details,
+        'The pinned list must become the expanded selected editor in the same popup');
+    assert(Main.layoutManager._trackedActors.length === chromeCount && panel.root.width > 500,
+        'Selected details expand the same popup without adding Chrome windows');
+    assert(panel.pinning.pinned && !panel.summary.visible && !panel.tabsBox.visible, 'Editor replaces list and retains pin');
+    await click(find(popup, 'Compact editor'));
+    assert(!panel.expanded, 'Real pointer must collapse editor');
+    await click(panel.editor.date);
+    assert(panel.editor, 'Date focus must keep the editor open');
+    await click(find(popup, 'Choose a date'));
+    await click(find(popup, 'Next month'));
+    assert(panel.editor, 'Mouse month navigation must keep editor open');
+    await activateFocused(find(popup, 'Next month'));
+    assert(panel.editor, 'Keyboard month navigation must keep editor open');
     const selectedDate = shiftMonth(app.today, 2).slice(0, 7) + '-01';
-    await activateFocused(find(panel.details.actor, formatDate(selectedDate)));
-    assert(panel.details && panel.details.editor.date.get_text() === selectedDate, 'Choosing a day must keep the unpinned editor open');
-    await click(find(panel.details.actor, 'Today'));
-    await click(find(panel.details.actor, 'Pin entry window'));
-    assert(panel.details.pinned, 'Real pointer must pin entry window');
-    panel.details.editor.text.set_text('Saved by actual button click');
-    await click(find(panel.details.actor, 'Save changes'));
-    assert(!panel.details && app.store.data.tasks[0].text === 'Saved by actual button click', 'Real pointer Save must update selected entry');
-    await click(panel);
-    assert(panel.menu.isOpen, 'Real pointer must reopen main menu');
+    await activateFocused(find(popup, formatDate(selectedDate)));
+    assert(panel.editor.date.get_text() === selectedDate, 'Keyboard day selection must update date');
+    await click(find(popup, 'Today'));
+    assert(panel.editor.date.get_text() === app.today, 'Today shortcut must restore the selected task date');
+    panel.editor.text.set_text('Return draft');
+    await click(find(popup, 'Back to list'));
+    assert(!panel.editor && !panel.expanded && panel.summary.visible && panel.root.width < 420 && panel.pinning.pinned,
+        'Back restores compact list and pin');
+    await click(find(popup, `Expand task: ${task.text}`));
+    assert(panel.editor.text.get_text() === 'Return draft', 'Expanded entry restores the selected draft');
+    await copyNativeWindowText(native);
+    await pasteIntoShellEntry(panel.editor.text);
+    assert(panel.menu.isOpen && panel.pinning.pinned && panel.editor.text.get_text().includes('External application text'),
+        'Pinned single panel survives native focus and accepts pasted text');
+    await escapeFrom(panel.editor.date);
+    assert(panel.menu.isOpen && !panel.editor && !panel.expanded, 'Escape from the pinned date field must restore the list');
+    await click(find(popup, `Expand task: ${task.text}`));
+    panel.editor.text.set_text('Saved by actual button click');
+    await click(find(popup, 'Save changes'));
+    assert(!panel.editor && panel.menu.isOpen && panel.root.width < 420 && app.store.data.tasks[0].text === 'Saved by actual button click',
+        'Save updates selected entry and returns same popup to compact list');
+    await click(find(popup, 'Unpin panel'));
     await click(find(panel.menu.actor, 'Notes'));
     assert(panel.tab === 'notes', 'Real pointer must switch tabs');
     panel.menu.close();
@@ -102,13 +128,21 @@ export async function run() {
     assert(app.store.data.tasks[0].inProgress, 'Pinned main menu must still accept real pointer input');
     await click(find(panel.menu.actor, 'Unpin panel'));
     assert(!panel.pinning.pinned, 'Real pointer must unpin main menu');
-    await click(find(panel.menu.actor, 'Open task in separate window: Saved by actual button click'));
-    panel.details.editor.text.set_text('Outside-click draft');
+    await click(find(panel.menu.actor, 'Expand task: Saved by actual button click'));
+    panel.editor.text.set_text('Outside-click draft');
     await clickPoint(20, 80);
-    assert(!panel.details && panel.entryDrafts.get(`tasks/${task.id}`).text === 'Outside-click draft', 'A real outside click closes unpinned details and retains the draft');
+    assert(!panel.menu.isOpen && panel.editor.text.get_text() === 'Outside-click draft', 'Outside click closes unpinned popup and retains editor');
+    await click(panel);
+    assert(panel.menu.isOpen && panel.expanded && panel.editor.text.get_text() === 'Outside-click draft', 'Reopening restores same expanded editor');
+    await escapeFrom(panel.editor.date);
+    assert(panel.menu.isOpen && !panel.editor && !panel.expanded, 'Escape from the unpinned date field returns to the list without closing popup');
+    await click(find(popup, 'Expand task: Saved by actual button click'));
+    assert(panel.editor.text.get_text() === 'Outside-click draft', 'Escape retains selected-entry draft');
+    await click(find(popup, 'Cancel'));
+    assert(!panel.editor && !panel.entryDrafts.size && panel.root.width < 420, 'Cancel discards selected draft and restores list');
     await Scripting.sleep(200);
     native.close();
     await Main.extensionManager.disableExtension('dayline@marekbartczak.github.io');
     await Scripting.sleep(200);
-    print('PASS: actual pointer input opens popup, starts/completes tasks, opens/pins/expands/saves entry window and switches tabs after reopening');
+    print('PASS: actual pointer input opens popup, starts/completes tasks, transitions one pinned panel between list and selected entry and switches tabs after reopening');
 }

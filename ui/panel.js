@@ -11,7 +11,6 @@ import {calendar} from './calendar.js';
 import {editor} from './editor.js';
 import {resolveAccent, backgroundColor, windowOpacity} from './appearance.js';
 import {PrivateNotes} from './privateNotes.js';
-import {EntryWindow} from './entryWindow.js';
 
 export const DaylinePanel = GObject.registerClass({
     // Fresh runtime snapshots can coexist with the previous GObject type.
@@ -25,6 +24,15 @@ export const DaylinePanel = GObject.registerClass({
         this.drafts = new Map();
         this.entryDrafts = new Map();
         this.expanded = false;
+        // Register before the panel menu manager, which otherwise consumes
+        // Escape and closes the popup before an entry can return to the list.
+        this.menu.actor.connect('captured-event', (_actor, event) => {
+            if (this.editor && this.editor.kind !== 'private' && event.type() === Clutter.EventType.KEY_PRESS && event.get_key_symbol() === Clutter.KEY_Escape) {
+                this.returnToList();
+                return Clutter.EVENT_STOP;
+            }
+            return Clutter.EVENT_PROPAGATE;
+        });
         const status = box(false, 'dayline-status');
         status.add_child(new St.Icon({gicon: Gio.icon_new_for_string(`${app.path}/icons/dayline-symbolic.svg`), style_class: 'system-status-icon'}));
         this.inProgressCounter = label('▶ 0', 'dayline-counter dayline-progress-counter');
@@ -160,37 +168,57 @@ export const DaylinePanel = GObject.registerClass({
         this.message.show();
     }
 
-    showEditor(kind, item) {
-        this.body.destroy_all_children();
-        this.composerArea.hide();
+    returnToList(discardDraft = false) {
+        const current = this.editor;
+        if (!current || current.kind === 'private') return;
+        if (current.item) {
+            const key = `${current.kind}/${current.item.id}`;
+            if (discardDraft) this.entryDrafts.delete(key);
+            else this.entryDrafts.set(key, {text: current.text.get_text(), date: current.date?.get_text()});
+        } else if (!discardDraft) {
+            this.composer.set_text(current.text.get_text());
+        }
+        this.editor = null;
         this.expanded = false;
-        const cancel = () => { this.editor = null; this.expanded = false; this.refresh(); };
-        this.editor = editor(kind, item, this.composer.get_text(), this.tab === 'today' ? this.app.today : this.selectedDate, this.app.store.data,
+        this.message.hide();
+        // Move focus to a surviving actor before replacing editor children.
+        this.composerArea.show();
+        this.composer.grab_key_focus();
+        this.refresh(true);
+    }
+
+    showEditor(kind, item, {expanded = false} = {}) {
+        this.body.destroy_all_children();
+        this.scroll.vadjustment.value = 0;
+        this.composerArea.hide();
+        this.message.hide();
+        this.expanded = expanded;
+        const draft = item && this.entryDrafts.get(`${kind}/${item.id}`);
+        const editedItem = item ? {...item, text: draft?.text ?? item.text, date: draft?.date ?? item.date} : null;
+        const cancel = () => this.returnToList(true);
+        this.editor = editor(kind, editedItem, this.composer.get_text(), this.tab === 'today' ? this.app.today : this.selectedDate, this.app.store.data,
             (text, date) => {
                 if (item) this.app.edit(kind, item.id, text, date);
                 else this.app.add(kind, text, date);
-                this.editor = null;
-                this.expanded = false;
                 if (!item) { this.composer.set_text(''); this.drafts.delete(this.draftKey()); }
-                this.refresh();
-            }, cancel, message => this.showMessage(message), () => this.setExpanded(!this.expanded));
+                this.returnToList(true);
+            }, cancel, message => this.showMessage(message), () => this.setExpanded(!this.expanded),
+            {onBack: () => this.returnToList(), onClose: () => this.returnToList(), title: item ? kind === 'tasks' ? 'Task details' : 'Note details' : undefined});
         this.body.add_child(this.editor.root);
         this.summary.hide();
         this.tabsBox.hide();
-        this.adjustSize();
+        this.adjustSize(true);
         this.editor.text.grab_key_focus();
     }
 
     openDetails(kind, item) {
         const current = this.app.store.data[kind].find(entry => entry.id === item.id);
         if (!current) { this.showMessage('This entry no longer exists.'); return; }
-        this.details?.close();
-        if (!this.pinning?.pinned) this.menu.close();
-        this.details = new EntryWindow(this, kind, current);
+        this.showEditor(kind, current, {expanded: true});
     }
 
-    entryWindowButton(kind, item) {
-        const control = iconButton(`Open ${kind === 'tasks' ? 'task' : 'note'} in separate window: ${item.text}`, null, () => this.openDetails(kind, item));
+    entryExpandButton(kind, item) {
+        const control = iconButton(`Expand ${kind === 'tasks' ? 'task' : 'note'}: ${item.text}`, null, () => this.openDetails(kind, item));
         control.set_child(new St.Icon({gicon: Gio.icon_new_for_string(`${this.app.path}/icons/expand-symbolic.svg`), icon_size: 16}));
         control.y_align = Clutter.ActorAlign.START;
         return control;
@@ -221,7 +249,7 @@ export const DaylinePanel = GObject.registerClass({
             start.y_align = Clutter.ActorAlign.START;
             row.add_child(start);
         }
-        row.add_child(this.entryWindowButton('tasks', item));
+        row.add_child(this.entryExpandButton('tasks', item));
         const remove = iconButton('Delete task', 'user-trash-symbolic', () => this.app.remove('tasks', item.id));
         remove.y_align = Clutter.ActorAlign.START;
         row.add_child(remove);
@@ -269,7 +297,7 @@ export const DaylinePanel = GObject.registerClass({
             const preview = item.text.length > 220 ? `${item.text.slice(0, 220)}…` : item.text;
             edit.set_child(label(preview, '', true));
             row.add_child(edit);
-            row.add_child(this.entryWindowButton('notes', item));
+            row.add_child(this.entryExpandButton('notes', item));
             const remove = iconButton('Delete note', 'user-trash-symbolic', () => this.app.remove('notes', item.id));
             remove.y_align = Clutter.ActorAlign.START;
             row.add_child(remove);
@@ -295,10 +323,9 @@ export const DaylinePanel = GObject.registerClass({
         const transition = this.menu.actor.get_transition('opacity');
         if (transition && this.menu.isOpen) transition.set_to(opacity);
         else if (!transition) this.menu.actor.opacity = opacity;
-        this.details?.updateTheme();
     }
 
-    refresh() {
+    refresh(animate = false) {
         this.updateTheme();
         const {remaining, done, total, inProgress, waiting} = todaySummary(this.app.store.data, this.app.today);
         this.counter.text = this.app.store.error ? '!' : String(waiting);
@@ -362,6 +389,6 @@ export const DaylinePanel = GObject.registerClass({
         this.composerCaption.text = this.tab === 'notes' ? 'NEW NOTE · NO DATE' : `ADD TASK · ${formatDate(this.tab === 'today' ? this.app.today : this.selectedDate, {day: 'numeric', month: 'short'})}`;
         this.composer.hint_text = this.tab === 'notes' ? 'What would you like to remember?' : 'What needs doing?';
         this.composer.clutter_text.max_length = this.tab === 'notes' ? MAX_NOTE_TEXT : MAX_TASK_TEXT;
-        this.adjustSize();
+        this.adjustSize(animate);
     }
 });

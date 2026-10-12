@@ -22,7 +22,6 @@ export default class DaylineExtension extends Extension {
         attachPin(this.panel);
         this.screenLockSignal = Main.screenShield.connect('locked-changed', () => {
             if (Main.screenShield.locked) {
-                this.panel.details?.close();
                 void this.panel.privateNotes.lock();
                 this.panel.menu.close(BoxPointer.PopupAnimation.NONE);
             }
@@ -141,7 +140,6 @@ export default class DaylineExtension extends Extension {
             this.monitor = null;
         }
         if (this.panel) {
-            this.panel.details?.close();
             void this.panel.privateNotes.dispose();
             this.panel.root.remove_all_transitions();
             this.panel.menu.close(BoxPointer.PopupAnimation.NONE);
