@@ -35,6 +35,11 @@ export async function createNativeTestWindow() {
             if (window) {
                 if (window.get_client_type() !== Meta.WindowClientType.WAYLAND)
                     throw new Error('The test window must use the isolated Wayland compositor.');
+                // Keep its text entry outside the centered floating editor.
+                // Clicking a covered window's center would target that editor.
+                const monitor = global.display.get_monitor_geometry(window.get_monitor());
+                window.move_frame(true, monitor.x + 8, monitor.y + 80);
+                await Scripting.sleep(100);
                 return {window, process, close};
             }
             await Scripting.sleep(50);

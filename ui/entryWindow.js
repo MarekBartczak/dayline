@@ -50,7 +50,7 @@ export class EntryWindow {
         });
         this.outsideSignal = global.stage.connect('captured-event', (_stage, event) => {
             if (!this.pinned && [Clutter.EventType.BUTTON_PRESS, Clutter.EventType.TOUCH_BEGIN].includes(event.type())) {
-                const source = event.get_source();
+                const source = global.stage.get_event_actor(event);
                 if (!source || !this.actor.contains(source)) this.close();
             }
             return Clutter.EVENT_PROPAGATE;
@@ -60,6 +60,11 @@ export class EntryWindow {
             const focus = global.stage.get_key_focus();
             if (focus && this.actor.contains(focus)) global.stage.set_key_focus(null);
             if (!this.pinned) this.close();
+        });
+        this.keyFocusSignal = global.stage.connect('notify::key-focus', () => {
+            if (this.closed || this.pinned) return;
+            const focus = global.stage.get_key_focus();
+            if (!focus || !this.actor.contains(focus)) this.close();
         });
         this.monitorSignal = Main.layoutManager.connect('monitors-changed', () => {
             this.monitor = Main.layoutManager.findMonitorForActor(this.actor) ?? Main.layoutManager.primaryMonitor;
@@ -134,6 +139,7 @@ export class EntryWindow {
         this.editor.text.set_text('');
         if (this.outsideSignal) global.stage.disconnect(this.outsideSignal);
         if (this.focusSignal) global.display.disconnect(this.focusSignal);
+        if (this.keyFocusSignal) global.stage.disconnect(this.keyFocusSignal);
         if (this.monitorSignal) Main.layoutManager.disconnect(this.monitorSignal);
         if (this.scaleSignal) this.themeContext.disconnect(this.scaleSignal);
         this.actor.disconnect(this.heightSignal);

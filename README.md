@@ -104,6 +104,7 @@ bash scripts/check.sh       # Domain, storage, encrypted vault, installer and sy
 bash scripts/test-shell.sh  # Actual isolated GNOME Shell 50 UI/lifecycle test
 DAYLINE_TEST_SCRIPT="$PWD/tests/privateShell.js" bash scripts/test-shell.sh # Private tab lifecycle
 DAYLINE_TEST_SCRIPT="$PWD/tests/entryWindows.js" bash scripts/test-shell.sh # Separate windows, opacity and gutters
+DAYLINE_TEST_SCRIPT="$PWD/tests/pointerInput.js" bash scripts/test-shell.sh # Real pointer controls and animation races
 ```
 
 The first command needs Node.js 22+, GJS and system Python 3 with `cryptography`. The Shell test also needs `gnome-shell-test-tool` from GNOME 50. It uses temporary XDG data, settings, and runtime directories, and synthetic examples. It does not touch your Dayline list or desktop extension settings.

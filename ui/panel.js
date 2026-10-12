@@ -289,10 +289,12 @@ export const DaylinePanel = GObject.registerClass({
         const styles = (this.menu.actor.get_style() ?? '').split(';').map(part => part.trim()).filter(part => part && !part.startsWith('-arrow-background-color:'));
         styles.push(`-arrow-background-color: ${backgroundColor(accent, light)}`);
         this.menu.actor.set_style(`${styles.join('; ')};`);
-        // BoxPointer's opening animation otherwise fades back to 255 after
-        // open-state-changed. Keep its size/slide animation, own only opacity.
-        if (this.menu.isOpen) this.menu.actor.remove_transition('opacity');
-        this.menu.actor.opacity = windowOpacity(this.app.settings.get_int('opacity'));
+        // BoxPointer unmutes pointer input when its opening transition finishes.
+        // Change the destination without cancelling that completion callback.
+        const opacity = windowOpacity(this.app.settings.get_int('opacity'));
+        const transition = this.menu.actor.get_transition('opacity');
+        if (transition && this.menu.isOpen) transition.set_to(opacity);
+        else if (!transition) this.menu.actor.opacity = opacity;
         this.details?.updateTheme();
     }
 

@@ -61,13 +61,16 @@ export function editor(kind, item, initialText, initialDate, data, onSave, onCan
         row.add_child(date);
         const picker = box(true);
         const choose = value => {
+            // Keep focus inside the editor before removing a focused day button.
+            date.grab_key_focus();
             date.set_text(value);
             picker.destroy_all_children();
             picker.hide();
         };
         row.add_child(iconButton('Choose a date', 'x-office-calendar-symbolic', () => {
-            if (picker.visible) { picker.hide(); return; }
+            if (picker.visible) { date.grab_key_focus(); picker.hide(); return; }
             const draw = value => {
+                date.grab_key_focus();
                 picker.destroy_all_children();
                 picker.add_child(calendar(value, data, choose, draw));
             };

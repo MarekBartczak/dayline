@@ -1,6 +1,6 @@
 {
   "name": "dayline",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "private": true,
   "type": "module",
   "description": "A quiet place for your day, in the GNOME top bar.",
