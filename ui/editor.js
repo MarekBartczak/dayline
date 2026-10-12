@@ -6,6 +6,7 @@ import Pango from 'gi://Pango';
 import {localDate, shiftDate, MAX_TASK_TEXT, MAX_NOTE_TEXT} from '../model.js';
 import {box, label, button, iconButton} from './widgets.js';
 import {calendar} from './calendar.js';
+import {createFormatting} from './formatting.js';
 
 export function editor(kind, item, initialText, initialDate, data, onSave, onCancel, onError, onExpand, options = {}) {
     const root = box(true, 'dayline-editor');
@@ -20,7 +21,7 @@ export function editor(kind, item, initialText, initialDate, data, onSave, onCan
     header.add_child(expand);
     root.add_child(header);
     root.add_child(label('DETAILS', 'dayline-caption'));
-    const text = new St.Entry({text: item?.text ?? initialText, style_class: 'dayline-textarea', can_focus: true, x_expand: true, accessible_name: 'Entry text'});
+    const text = new St.Entry({text: item?.text ?? initialText, style_class: 'dayline-textarea', can_focus: true, x_expand: true, y_align: Clutter.ActorAlign.START, accessible_name: 'Entry text'});
     text.clutter_text.set_single_line_mode(false);
     text.clutter_text.set_activatable(false);
     text.clutter_text.line_wrap = true;
@@ -28,7 +29,8 @@ export function editor(kind, item, initialText, initialDate, data, onSave, onCan
     text.clutter_text.max_length = kind === 'notes' ? MAX_NOTE_TEXT : MAX_TASK_TEXT;
     const field = new St.ScrollView({style_class: 'dayline-editor-field dayline-textarea', x_expand: true, overlay_scrollbars: true, hscrollbar_policy: St.PolicyType.NEVER, vscrollbar_policy: St.PolicyType.AUTOMATIC});
     const fieldContent = box(true);
-    fieldContent.add_child(text);
+    const stack = new St.Widget({layout_manager: new Clutter.BinLayout(), x_expand: true});
+    fieldContent.add_child(stack);
     field.set_child(fieldContent);
     root.add_child(field);
     let revealSource = 0;
@@ -65,16 +67,19 @@ export function editor(kind, item, initialText, initialDate, data, onSave, onCan
     let heightLimit = 190;
     const measure = () => {
         const scale = St.ThemeContext.get_for_stage(global.stage).scale_factor;
-        const width = Math.max(180 * scale, text.width - 24 * scale);
+        const width = Math.max(180 * scale, text.width - 52 * scale);
         const [, natural] = text.clutter_text.get_preferred_height(width);
-        const height = Math.max(expanded ? Math.min(240, heightLimit) : 105, Math.ceil(natural / scale) + 26);
+        const height = Math.max(105, Math.ceil(natural / scale) + 26);
         // Keep the entire document at its natural height. Only the surrounding
         // ScrollView is bounded; shrinking this Entry clips text before scrolling.
-        text.set_style(`min-height: ${height}px; padding: 12px; border-width: 0px; border-radius: 0px; background-color: transparent;`);
+        text.set_style(`min-height: ${height}px; padding: 12px 40px 12px 12px; border-width: 0px; border-radius: 0px; background-color: transparent;`);
         field.set_style(`height: ${Math.min(heightLimit, Math.max(expanded ? Math.min(240, heightLimit) : 105, height))}px; min-height: 0px; padding: 0px;`);
     };
     text.connect('notify::width', measure);
     text.connect('notify::height', revealCaret);
+    const formatting = createFormatting({text, field, stack, format: options.format ?? item?.format,
+        limit: kind === 'notes' ? MAX_NOTE_TEXT : MAX_TASK_TEXT, onError, onChange: () => { measure(); revealCaret(); }});
+    root.insert_child_at_index(formatting.toolbar, 2);
     text.clutter_text.connect('text-changed', () => { measure(); revealCaret(); });
     text.clutter_text.connect('notify::cursor-position', revealCaret);
     let date = null;
@@ -114,7 +119,7 @@ export function editor(kind, item, initialText, initialDate, data, onSave, onCan
         root.add_child(label('No date. Keep ideas and details you want to come back to.', 'dayline-muted', true));
     }
     const save = () => {
-        try { onSave(text.get_text(), date?.get_text()); } catch (error) { onError(error.message); }
+        try { onSave(text.get_text(), date?.get_text(), formatting.getFormat()); } catch (error) { onError(error.message); }
     };
     const actions = box(false, 'dayline-editor-actions');
     actions.add_child(button('Cancel', onCancel, 'dayline-secondary'));
@@ -134,11 +139,12 @@ export function editor(kind, item, initialText, initialDate, data, onSave, onCan
         }
         return Clutter.EVENT_PROPAGATE;
     });
-    return {root, text, date, kind, item,
+    return {root, text, date, kind, item, getFormat: formatting.getFormat,
         resize(value, limit) {
             expanded = value;
             heightLimit = limit;
             expand.accessible_name = value ? 'Compact editor' : 'Expand editor';
+            formatting.setExpanded(value);
             measure();
         },
     };

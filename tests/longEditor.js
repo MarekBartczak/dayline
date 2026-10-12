@@ -45,7 +45,8 @@ export async function run() {
     const app = Main.extensionManager.lookup(uuid).stateObj;
     const panel = app.panel;
     const content = Array.from({length: 24}, (_, i) => `Step ${i + 1}: review permissions and document the integration flow.`).join('\n') + '\nEND OF TASK';
-    app.add('tasks', content, app.today);
+    const formatted = GLib.getenv('DAYLINE_TEST_FORMATTED_LONG');
+    app.add('tasks', content, app.today, formatted ? [{type: 'code', start: 0, end: content.length}] : undefined);
     panel.menu.open();
     panel.pinning.setPinned(true);
     panel.showEditor('tasks', app.store.data.tasks[0]);
@@ -73,6 +74,7 @@ export async function run() {
     panel.editor.text.set_text(extended);
     await Scripting.sleep(300);
     assert(panel.editor.text.get_text() === extended && extended.length === 50000, 'All 50,000 characters must remain editable');
+    if (formatted) assert(panel.editor.getFormat().some(range => range.type === 'code' && range.start === 0 && range.end === extended.length), 'Code formatting covers the complete 50,000-character document');
     app.edit('tasks', panel.editor.item.id, panel.editor.text.get_text(), app.today);
     assert(app.store.data.tasks[0].text === extended, 'Complete 50,000-character task must survive saving');
     app.reload();

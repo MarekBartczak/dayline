@@ -29,7 +29,23 @@ export async function activateUpdate(record, directory = null) {
     const view = {tab: old.panel?.tab ?? 'today', date: old.panel?.selectedDate ?? old.today, draft: old.panel?.composer.get_text() ?? '', drafts: new Map(old.panel?.drafts ?? []), entryDrafts: new Map([...(old.panel?.entryDrafts ?? [])].map(([key, value]) => [key, {...value}])), pinned: old.panel?.pinning?.pinned ?? false, open: old.panel?.menu.isOpen ?? false, active: Boolean(old.panel)};
     const manager = Main.extensionManager;
     old.panel?.menu.close(BoxPointer.PopupAnimation.NONE);
+    old.panel?.root?.remove_all_transitions();
+    const oldPopup = old.panel?.menu.actor;
+    oldPopup?.remove_all_transitions();
+    if (oldPopup && record.metadata.version === 1) {
+        // Let the legacy menu's queued Shell layout finish while its actors
+        // are still alive. Its original disable() has no layout cleanup.
+        await new Promise(resolve => GLib.timeout_add(GLib.PRIORITY_DEFAULT, 50, () => {
+            resolve();
+            return GLib.SOURCE_REMOVE;
+        }));
+    }
     Main.layoutManager.panelBox.get_allocation_box();
+    Main.uiGroup.get_allocation_box();
+    // Early releases destroyed a popup while it still belonged to uiGroup.
+    // Detach it before their disable() runs so Shell's pending layout cannot
+    // ask a disposed BoxPointer for its preferred size.
+    oldPopup?.get_parent()?.remove_child(oldPopup);
     await manager._callExtensionDisable(record.uuid);
     try {
         Object.assign(record, {stateObj: replacement, metadata, dir, path: directory});

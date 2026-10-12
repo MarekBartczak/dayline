@@ -87,7 +87,7 @@ export default class DaylinePreferences extends ExtensionPreferences {
             });
         });
         const info = new Adw.PreferencesGroup({title: 'A small tool. A clearer mind.'});
-        info.add(new Adw.ActionRow({title: 'Dayline 0.2.5', subtitle: 'The counter includes only unfinished tasks for today.\nOverdue tasks appear in their own section.'}));
+        info.add(new Adw.ActionRow({title: 'Dayline 0.3.0', subtitle: 'The counter includes only unfinished tasks for today.\nOverdue tasks appear in their own section.'}));
         page.add(info);
     }
 }

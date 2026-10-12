@@ -3,7 +3,7 @@ set -euo pipefail
 project_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 mkdir -p "$project_dir/dist"
 gnome-extensions pack --force \
-    --extra-source=model.js --extra-source=store.js --extra-source=ui \
+    --extra-source=model.js --extra-source=formatting.js --extra-source=store.js --extra-source=ui \
     --extra-source=liveUpdate.js \
     --extra-source=vault.js --extra-source=private_vault.py \
     --extra-source=icons --extra-source=LICENSE \

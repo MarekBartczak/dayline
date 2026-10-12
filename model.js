@@ -1,4 +1,5 @@
 // Pure domain logic shared by GNOME Shell, preferences and Node tests.
+import {validateFormat, remapFormat} from './formatting.js';
 export const MAX_TASK_TEXT = 50000;
 export const MAX_NOTE_TEXT = 10000;
 const pad = number => String(number).padStart(2, '0');
@@ -58,12 +59,12 @@ function exactKeys(object, keys) {
         throw new Error('Invalid Dayline data format.');
 }
 
-function cleanText(text, limit) {
+function cleanText(text, limit, preserveWhitespace = false) {
     if (typeof text !== 'string' || !text.trim())
         throw new Error('Enter text before saving.');
     if (text.length > limit)
         throw new Error(`Text must be no longer than ${limit} characters.`);
-    return text.trim();
+    return preserveWhitespace ? text : text.trim();
 }
 
 export function validateDocument(document) {
@@ -77,7 +78,11 @@ export function validateDocument(document) {
         const taskKeys = ['id', 'text', 'date', 'done', 'createdAt'];
         if (document.version === 2)
             taskKeys.push('inProgress');
-        exactKeys(item, kind === 'tasks' ? taskKeys : ['id', 'text', 'createdAt']);
+        const keys = kind === 'tasks' ? taskKeys : ['id', 'text', 'createdAt'];
+        const hasFormat = item && Object.hasOwn(item, 'format');
+        if (hasFormat)
+            keys.push('format');
+        exactKeys(item, keys);
         if (typeof item.id !== 'string' || !item.id || item.id.length > 128 || ids.has(item.id))
             throw new Error('Invalid or duplicate entry ID.');
         ids.add(item.id);
@@ -90,34 +95,49 @@ export function validateDocument(document) {
             throw new Error('Invalid task status. Completed tasks cannot be in progress.');
         // Validate existing text without altering data imported from either version.
         cleanText(item.text, kind === 'tasks' ? MAX_TASK_TEXT : MAX_NOTE_TEXT);
-        return kind === 'tasks' ? {...item, inProgress: document.version === 1 ? false : item.inProgress} : {...item};
+        const result = kind === 'tasks' ? {...item, inProgress: document.version === 1 ? false : item.inProgress} : {...item};
+        if (hasFormat) {
+            if (!Array.isArray(item.format))
+                throw new Error('Invalid formatting ranges.');
+            result.format = validateFormat(item.text, item.format);
+        }
+        return result;
     };
     return {version: 2, tasks: document.tasks.map(item => validate(item, 'tasks')), notes: document.notes.map(item => validate(item, 'notes'))};
 }
 
 export function addTask(data, item) {
     const document = validateDocument(data);
-    return validateDocument({...document, tasks: [...document.tasks, {...item, text: cleanText(item.text, MAX_TASK_TEXT), done: false, inProgress: false}]});
+    return validateDocument({...document, tasks: [...document.tasks, {...item, text: cleanText(item.text, MAX_TASK_TEXT, Object.hasOwn(item, 'format')), done: false, inProgress: false}]});
 }
 
 export function addNote(data, item) {
     const document = validateDocument(data);
-    return validateDocument({...document, notes: [...document.notes, {...item, text: cleanText(item.text, MAX_NOTE_TEXT)}]});
+    return validateDocument({...document, notes: [...document.notes, {...item, text: cleanText(item.text, MAX_NOTE_TEXT, Object.hasOwn(item, 'format'))}]});
 }
 
 function update(data, kind, id, patch) {
     data = validateDocument(data);
-    if (!data[kind].some(item => item.id === id))
+    const existing = data[kind].find(item => item.id === id);
+    if (!existing)
         throw new Error('This entry no longer exists.');
-    const allowed = kind === 'tasks' ? ['text', 'date', 'done', 'inProgress'] : ['text'];
+    const allowed = kind === 'tasks' ? ['text', 'format', 'date', 'done', 'inProgress'] : ['text', 'format'];
     if (Object.keys(patch).some(key => !allowed.includes(key)))
         throw new Error('Invalid update fields.');
     patch = {...patch};
     if (Object.hasOwn(patch, 'text'))
-        patch.text = cleanText(patch.text, kind === 'tasks' ? MAX_TASK_TEXT : MAX_NOTE_TEXT);
+        patch.text = cleanText(patch.text, kind === 'tasks' ? MAX_TASK_TEXT : MAX_NOTE_TEXT,
+            Object.hasOwn(patch, 'format') || Object.hasOwn(existing, 'format'));
     if (kind === 'tasks' && patch.done === true)
         patch.inProgress = false;
-    return validateDocument({...data, [kind]: data[kind].map(item => item.id === id ? {...item, ...patch} : item)});
+    return validateDocument({...data, [kind]: data[kind].map(item => {
+        if (item.id !== id)
+            return item;
+        const result = {...item, ...patch};
+        if (Object.hasOwn(item, 'format') && Object.hasOwn(patch, 'text') && !Object.hasOwn(patch, 'format'))
+            result.format = remapFormat(item.text, patch.text, item.format);
+        return result;
+    })});
 }
 
 export const updateTask = (data, id, patch) => update(data, 'tasks', id, patch);

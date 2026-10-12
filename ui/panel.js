@@ -11,6 +11,8 @@ import {calendar} from './calendar.js';
 import {editor} from './editor.js';
 import {resolveAccent, backgroundColor, windowOpacity} from './appearance.js';
 import {PrivateNotes} from './privateNotes.js';
+import {formattedLabel} from './formatting.js';
+import {remapFormat} from '../formatting.js';
 
 export const DaylinePanel = GObject.registerClass({
     // Fresh runtime snapshots can coexist with the previous GObject type.
@@ -129,6 +131,10 @@ export const DaylinePanel = GObject.registerClass({
         return this.tab === 'notes' ? 'notes' : this.tab === 'today' ? this.app.today : this.selectedDate;
     }
 
+    newEntryKey(kind) {
+        return JSON.stringify(['new', kind, this.draftKey()]);
+    }
+
     selectTab(tab) {
         if (this.tab !== 'private') this.drafts.set(this.draftKey(), this.composer.get_text());
         this.tab = tab;
@@ -149,7 +155,12 @@ export const DaylinePanel = GObject.registerClass({
     submit() {
         const kind = this.tab === 'notes' ? 'notes' : 'tasks';
         try {
-            this.app.add(kind, this.composer.get_text(), this.tab === 'today' ? this.app.today : this.selectedDate);
+            const key = this.newEntryKey(kind);
+            const draft = this.entryDrafts.get(key);
+            const text = this.composer.get_text();
+            this.app.add(kind, text, draft?.date ?? (this.tab === 'today' ? this.app.today : this.selectedDate),
+                draft ? remapFormat(draft.text, text, draft.format) : undefined);
+            this.entryDrafts.delete(key);
             this.composer.set_text('');
             this.drafts.delete(this.draftKey());
             this.composer.grab_key_focus();
@@ -174,9 +185,15 @@ export const DaylinePanel = GObject.registerClass({
         if (current.item) {
             const key = `${current.kind}/${current.item.id}`;
             if (discardDraft) this.entryDrafts.delete(key);
-            else this.entryDrafts.set(key, {text: current.text.get_text(), date: current.date?.get_text()});
-        } else if (!discardDraft) {
-            this.composer.set_text(current.text.get_text());
+            else this.entryDrafts.set(key, {text: current.text.get_text(), date: current.date?.get_text(), format: current.getFormat()});
+        } else {
+            const key = current.newDraftKey ?? this.newEntryKey(current.kind);
+            if (discardDraft) this.entryDrafts.delete(key);
+            else {
+                const text = current.text.get_text();
+                this.entryDrafts.set(key, {text, date: current.date?.get_text(), format: current.getFormat()});
+                this.composer.set_text(text);
+            }
         }
         this.editor = null;
         this.expanded = false;
@@ -194,16 +211,20 @@ export const DaylinePanel = GObject.registerClass({
         this.message.hide();
         this.expanded = expanded;
         const draft = item && this.entryDrafts.get(`${kind}/${item.id}`);
-        const editedItem = item ? {...item, text: draft?.text ?? item.text, date: draft?.date ?? item.date} : null;
+        const newKey = this.newEntryKey(kind);
+        const newDraft = !item && this.entryDrafts.get(newKey);
+        const editedItem = item ? {...item, text: draft?.text ?? item.text, date: draft?.date ?? item.date, format: draft?.format ?? item.format} : null;
         const cancel = () => this.returnToList(true);
-        this.editor = editor(kind, editedItem, this.composer.get_text(), this.tab === 'today' ? this.app.today : this.selectedDate, this.app.store.data,
-            (text, date) => {
-                if (item) this.app.edit(kind, item.id, text, date);
-                else this.app.add(kind, text, date);
+        this.editor = editor(kind, editedItem, this.composer.get_text(), newDraft?.date ?? (this.tab === 'today' ? this.app.today : this.selectedDate), this.app.store.data,
+            (text, date, format) => {
+                if (item) this.app.edit(kind, item.id, text, date, format);
+                else this.app.add(kind, text, date, format);
                 if (!item) { this.composer.set_text(''); this.drafts.delete(this.draftKey()); }
                 this.returnToList(true);
             }, cancel, message => this.showMessage(message), () => this.setExpanded(!this.expanded),
-            {onBack: () => this.returnToList(), onClose: () => this.returnToList(), title: item ? kind === 'tasks' ? 'Task details' : 'Note details' : undefined});
+            {onBack: () => this.returnToList(), onClose: () => this.returnToList(), title: item ? kind === 'tasks' ? 'Task details' : 'Note details' : undefined,
+                format: newDraft ? remapFormat(newDraft.text, this.composer.get_text(), newDraft.format) : undefined});
+        if (!item) this.editor.newDraftKey = newKey;
         this.body.add_child(this.editor.root);
         this.summary.hide();
         this.tabsBox.hide();
@@ -237,7 +258,7 @@ export const DaylinePanel = GObject.registerClass({
         const lines = item.text.split('\n');
         let preview = lines.slice(0, 4).join('\n');
         if (preview.length > 220 || lines.length > 4) preview = `${preview.slice(0, 220)}…`;
-        content.add_child(label(preview, item.done ? 'dayline-done-text' : '', true));
+        content.add_child(formattedLabel(preview, item.format, item.done ? 'dayline-done-text' : '', true));
         if (item.inProgress && !item.done)
             content.add_child(label('In progress', 'dayline-in-progress-badge'));
         if (overdue)
@@ -295,7 +316,7 @@ export const DaylinePanel = GObject.registerClass({
             const edit = button(`Edit: ${item.text}`, () => this.showEditor('notes', item), 'dayline-task-text-button');
             edit.x_expand = true;
             const preview = item.text.length > 220 ? `${item.text.slice(0, 220)}…` : item.text;
-            edit.set_child(label(preview, '', true));
+            edit.set_child(formattedLabel(preview, item.format, '', true));
             row.add_child(edit);
             row.add_child(this.entryExpandButton('notes', item));
             const remove = iconButton('Delete note', 'user-trash-symbolic', () => this.app.remove('notes', item.id));

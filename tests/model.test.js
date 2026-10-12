@@ -163,3 +163,59 @@ test('today separates active and waiting tasks and orders active, waiting, then 
     assert.deepEqual(m.todaySummary(data, '2026-10-14'), {remaining: 0, total: 0, done: 0, inProgress: 0, waiting: 0});
     assert.deepEqual(m.overdueTasks(data, '2026-10-12').map(item => item.id), ['overdue-active']);
 });
+
+test('formatted public entries preserve exact whitespace and detached annotations', () => {
+    const format = [{type: 'code', start: 0, end: 9}];
+    const added = m.addTask(empty(), {id: 'code', text: '  a\n\tb  \n', format, date: '2026-10-12', createdAt: timestamp});
+    assert.equal(added.tasks[0].text, '  a\n\tb  \n');
+    assert.deepEqual(added.tasks[0].format, format);
+    added.tasks[0].format[0].start = 1;
+    assert.equal(format[0].start, 0);
+    const note = m.addNote(empty(), {id: 'n', text: '  text\n', format: [], createdAt: timestamp});
+    assert.equal(note.notes[0].text, '  text\n');
+    assert.deepEqual(note.notes[0].format, []);
+    assert.equal(m.updateNote(note, 'n', {text: '\t edited \n', format: []}).notes[0].text, '\t edited \n');
+});
+
+test('editing annotations implicitly remaps ranges while explicit formats replace them', () => {
+    const added = m.addTask(empty(), {id: 'a', text: 'a😀bc', format: [{type: 'bold', start: 1, end: 3}], date: '2026-10-12', createdAt: timestamp});
+    const edited = m.updateTask(added, 'a', {text: 'Xa😀bc'});
+    assert.deepEqual(edited.tasks[0].format, [{type: 'bold', start: 2, end: 4}]);
+    assert.deepEqual(m.updateTask(edited, 'a', {format: []}).tasks[0].format, []);
+    assert.deepEqual(m.updateTask(edited, 'a', {done: true}).tasks[0].format, edited.tasks[0].format);
+    assert.equal(Object.hasOwn(m.addNote(empty(), {id: 'p', text: 'plain', createdAt: timestamp}).notes[0], 'format'), false);
+});
+
+test('implicit edits of formatted entries preserve indentation and trailing newlines', () => {
+    const format = [{type: 'code', start: 0, end: 7}];
+    const added = m.addNote(empty(), {id: 'code', text: '  code\n', format, createdAt: timestamp});
+    const edited = m.updateNote(added, 'code', {text: '  code!\n'});
+    assert.equal(edited.notes[0].text, '  code!\n');
+    assert.deepEqual(edited.notes[0].format, [{type: 'code', start: 0, end: 8}]);
+    assert.equal(added.notes[0].text, '  code\n');
+    const task = m.addTask(empty(), {id: 'formatted', text: '  text\n', format: [], date: '2026-10-12', createdAt: timestamp});
+    assert.equal(m.updateTask(task, 'formatted', {text: '\t changed \n'}).tasks[0].text, '\t changed \n');
+    const plain = m.addNote(empty(), {id: 'plain', text: 'plain', createdAt: timestamp});
+    assert.equal(m.updateNote(plain, 'plain', {text: '\t changed \n'}).notes[0].text, 'changed');
+});
+
+test('document validation rejects invalid optional formats and keeps legacy versions', () => {
+    const original = {...empty(), tasks: [{...task('a', '2026-10-12'), text: 'A😀b', format: [{type: 'bold', start: 1, end: 2}]}]};
+    assert.deepEqual(m.validateDocument(original), original);
+    const copy = m.validateDocument(original);
+    copy.tasks[0].format[0].end = 3;
+    assert.equal(original.tasks[0].format[0].end, 2);
+    for (const format of [null, undefined, {}, [{type: 'code', start: 0, end: 4}], [{type: 'color', start: 0, end: 1}], [{type: 'bold', start: 0, end: 1, markup: 'x'}]])
+        assert.throws(() => m.validateDocument({...original, tasks: [{...original.tasks[0], format}]}));
+    const legacy = {...original.tasks[0]};
+    delete legacy.inProgress;
+    assert.deepEqual(m.validateDocument({version: 1, tasks: [legacy], notes: []}).tasks[0].format, legacy.format);
+});
+
+test('formatted 50k task documents round trip and reject oversized text', () => {
+    const text = ` ${'x'.repeat(m.MAX_TASK_TEXT - 3)}\t\n`;
+    const format = [{type: 'code', start: 0, end: text.length}];
+    const added = m.addTask(empty(), {id: 'long-format', text, format, date: '2026-10-12', createdAt: timestamp});
+    assert.equal(m.validateDocument(JSON.parse(JSON.stringify(added))).tasks[0].text, text);
+    assert.throws(() => m.updateTask(added, 'long-format', {text: `${text}x`, format: []}));
+});

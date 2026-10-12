@@ -147,6 +147,20 @@
 .dayline-compact .dayline-editor { spacing: 9px; }
 .dayline-compact .dayline-textarea { min-height: 105px; }
 
+.dayline-format-toolbar { spacing: 6px; padding: 2px 0; }
+.dayline-format-button { padding: 6px 10px; border-radius: 7px; color: #dddce9; background-color: #2b2c3a; }
+.dayline-format-button:hover, .dayline-format-button:focus { background-color: #414051; }
+.dayline-format-bold { font-weight: 700; }
+.dayline-format-italic { font-style: italic; }
+.dayline-code-frame { background-color: #232533; border: 1px solid #49485c; border-radius: 8px; }
+.dayline-code-copy { color: #bebccb; padding: 4px; border-radius: 5px; }
+.dayline-code-copy:hover, .dayline-code-copy:focus { background-color: #434455; color: #ffffff; }
+.dayline-light .dayline-format-button { color: #504961; background-color: #eeebf4; }
+.dayline-light .dayline-format-button:hover, .dayline-light .dayline-format-button:focus { background-color: #e1dcec; }
+.dayline-light .dayline-code-frame { background-color: #f0f1f5; border-color: #d4d2e0; }
+.dayline-light .dayline-code-copy { color: #777183; }
+.dayline-light .dayline-code-copy:hover, .dayline-light .dayline-code-copy:focus { background-color: #dedee8; color: #332d40; }
+
 .dayline-accent-ubuntu .dayline-summary { background-color: #3e2e27; border-color: #3e2e27; }
 .dayline-accent-ubuntu .dayline-big-count, .dayline-accent-ubuntu .dayline-summary-caption, .dayline-accent-ubuntu .dayline-empty-icon { color: #f8b391; }
 .dayline-accent-ubuntu .dayline-progress-fill, .dayline-accent-ubuntu .dayline-add, .dayline-accent-ubuntu .dayline-primary, .dayline-accent-ubuntu .dayline-day-selected { background-color: #f8b391; color: #231b26; }

@@ -2,7 +2,9 @@ import St from 'gi://St';
 import GLib from 'gi://GLib';
 import {box, label, button, iconButton, emptyState, sectionHeading} from './widgets.js';
 import {editor} from './editor.js';
+import {formattedLabel} from './formatting.js';
 import {MAX_NOTE_TEXT} from '../model.js';
+import {validateFormat} from '../formatting.js';
 
 // Private text never enters the public composer, model, undo queue or export.
 export class PrivateNotes {
@@ -93,14 +95,14 @@ export class PrivateNotes {
             if (this.vault.draft) body.add_child(button('Resume saved draft', () => {
                 const draft = this.vault.draft;
                 const item = this.vault.notes.find(note => note.id === draft.id) ?? null;
-                this.showEditor(item, draft.text);
+                this.showEditor(item, draft.text, draft.format ?? []);
             }, 'dayline-chip'));
             if (!this.vault.notes.length) body.add_child(emptyState('document-edit-symbolic', 'Your private notebook', 'Only this vault contains these notes. They are excluded from regular exports.'));
             for (const note of [...this.vault.notes].reverse()) {
                 const row = box(false, 'dayline-note');
                 const open = button('Open private note', () => this.showEditor(note), 'dayline-task-text-button');
                 open.x_expand = true;
-                open.set_child(label(note.text.length > 220 ? `${note.text.slice(0, 220)}…` : note.text, '', true));
+                open.set_child(formattedLabel(note.text.length > 220 ? `${note.text.slice(0, 220)}…` : note.text, note.format, '', true));
                 row.add_child(open);
                 row.add_child(iconButton('Delete private note', 'user-trash-symbolic', () => this.run(() => this.vault.save(this.vault.notes.filter(item => item.id !== note.id), this.vault.draft?.id === note.id ? null : this.vault.draft))));
                 body.add_child(row);
@@ -119,7 +121,7 @@ export class PrivateNotes {
         this.panel.showMessage(message);
     }
 
-    showEditor(item, initialText = item?.text ?? '') {
+    showEditor(item, initialText = item?.text ?? '', initialFormat = item?.format ?? []) {
         if (this.pending || this.closing || !this.vault.unlocked) return;
         const panel = this.panel;
         panel.body.destroy_all_children();
@@ -133,17 +135,19 @@ export class PrivateNotes {
             panel.expanded = false;
             panel.message.hide();
         };
-        const noteEditor = editor('notes', item ? {...item, text: initialText} : null, initialText, null, panel.app.store.data,
-            text => {
-                if (this.pending) return;
-                const trimmed = text.trim();
-                if (!trimmed || trimmed.length > MAX_NOTE_TEXT) { this.showError('Enter a note with 1–10,000 characters.'); return; }
+        const noteEditor = editor('notes', item ? {...item, text: initialText, format: initialFormat} : null, initialText, null, panel.app.store.data,
+            (text, _date, format = []) => {
+                if (this.pending || this.closing || !this.vault.unlocked) return;
+                const ranges = validateFormat(text, format);
+                if (!text.trim() || text.length > MAX_NOTE_TEXT) { this.showError('Enter a note with 1–10,000 characters.'); return; }
+                // Preserve annotated offsets and the indentation of selected code.
+                const savedText = ranges.length ? text : text.trim();
                 const notes = this.vault.notes.map(note => ({...note}));
                 if (item) {
                     const index = notes.findIndex(note => note.id === item.id);
                     if (index < 0) { this.showError('This private note no longer exists.'); return; }
-                    notes[index].text = trimmed;
-                } else notes.push({id: GLib.uuid_string_random(), text: trimmed, createdAt: new Date().toISOString()});
+                    notes[index] = {...notes[index], text: savedText, format: ranges};
+                } else notes.push({id: GLib.uuid_string_random(), text: savedText, format: ranges, createdAt: new Date().toISOString()});
                 const write = {committed: false};
                 this.editorWrite = write;
                 this.run(async () => { await this.vault.save(notes, null); write.committed = true; }, leave);
@@ -152,7 +156,7 @@ export class PrivateNotes {
                 const write = {committed: false};
                 this.editorWrite = write;
                 this.run(async () => { await this.vault.save(this.vault.notes, null); write.committed = true; }, leave);
-            }, message => this.showError(message), () => panel.setExpanded(!panel.expanded));
+            }, message => this.showError(message), () => panel.setExpanded(!panel.expanded), {format: initialFormat});
         noteEditor.kind = 'private';
         panel.editor = noteEditor;
         panel.body.add_child(noteEditor.root);
@@ -165,7 +169,11 @@ export class PrivateNotes {
         this.epoch++;
         this.error = '';
         const panel = this.panel;
-        const draft = panel.editor?.kind === 'private' ? {id: panel.editor.item?.id ?? null, text: panel.editor.text.get_text()} : undefined;
+        const draft = panel.editor?.kind === 'private' ? {
+            id: panel.editor.item?.id ?? null,
+            text: panel.editor.text.get_text(),
+            format: panel.editor.getFormat?.() ?? [],
+        } : undefined;
         if (panel.editor?.kind === 'private') {
             panel.editor.text.set_text('');
             panel.editor = null;

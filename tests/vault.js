@@ -38,6 +38,38 @@ try {
     const exposed = vault.notes;
     exposed[0].text = 'Changed outside vault';
     assert(vault.notes[0].text === note.text, 'Getter must not expose mutable internal state');
+    const codeText = '\n    🔐print("hello")\n  ';
+    const format = [{type: 'code', start: 0, end: Array.from(codeText).length}, {type: 'bold', start: 5, end: 6}];
+    const formatted = {...note, text: codeText, format};
+    const formattedDraft = {id: note.id, text: codeText, format};
+    const formattingSave = vault.save([formatted], formattedDraft);
+    // Request cloning prevents later caller mutation from changing queued data.
+    format[0].end = 1;
+    await formattingSave;
+    const [, encryptedBytes] = Gio.File.new_for_path(path).load_contents(null);
+    const envelopeText = new TextDecoder().decode(encryptedBytes);
+    assert(!envelopeText.includes('format') && !envelopeText.includes(codeText), 'Formatting and code must remain inside encrypted payload');
+    vault.lock();
+    await vault.unlock(password);
+    assert(vault.notes[0].text === codeText && vault.draft.text === codeText, 'Encrypted code whitespace must survive lock');
+    assert(vault.notes[0].format[0].end === Array.from(codeText).length && vault.draft.format[0].end === Array.from(codeText).length, 'Formatting must survive encrypted note and draft roundtrip');
+    const noteClone = vault.notes;
+    const draftClone = vault.draft;
+    noteClone[0].format[0].end = 1;
+    draftClone.format[0].end = 1;
+    assert(vault.notes[0].format[0].end > 1 && vault.draft.format[0].end > 1, 'Formatting getters must clone nested metadata');
+    for (const invalid of [null, [{type: 'bold', start: true, end: 1}], [{type: 'code', start: 0, end: 3}], [{type: 'italic', start: 0, end: 1, extra: true}], Array(2001).fill({type: 'bold', start: 0, end: 1})]) {
+        assert(await rejected(vault.save([{...note, text: '🔐x', format: invalid}])), 'Malformed note formatting must reject');
+        assert(await rejected(vault.save(vault.notes, {id: null, text: '🔐x', format: invalid})), 'Malformed draft formatting must reject');
+    }
+    const limitText = '🔐'.repeat(5000);
+    await vault.save([{...note, text: limitText, format: [{type: 'code', start: 0, end: 5000}]}]);
+    assert(await rejected(vault.save([{...note, text: limitText + 'x', format: []}])), 'Formatted notes must retain 10000 UTF-16 limit');
+    assert(await rejected(vault.save(vault.notes, {id: null, text: limitText + 'x', format: []})), 'Formatted drafts must retain 10000 UTF-16 limit');
+    await vault.save([{...note, format: []}], {id: null, text: '', format: []});
+    vault.lock();
+    await vault.unlock(password);
+    assert(vault.notes[0].format.length === 0 && vault.draft.format.length === 0, 'Saving no ranges must clear previous annotations');
     const firstSave = vault.save([{...note, text: 'First queued save'}]);
     const lastSave = vault.save([{...note, text: 'Second queued save'}], {id: null, text: 'New note draft'});
     await vault.whenIdle();
@@ -67,7 +99,7 @@ try {
     const [, bytes] = file.load_contents(null);
     assert(new TextDecoder().decode(bytes) === '{broken', 'Failed save must retain corrupt original');
     vault.lock();
-    print('PASS: async encrypted vault, draft recovery, serialization and lock cancellation');
+    print('PASS: async encrypted vault, formatting and draft recovery, Unicode limits, serialization and lock cancellation');
 } finally {
     for (const name of ['private-notes.vault', 'private-notes.vault.lock']) {
         const file = Gio.File.new_for_path(GLib.build_filenamev([directory, name]));

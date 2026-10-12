@@ -85,6 +85,83 @@ class PrivateVaultTest(unittest.TestCase):
         self.path.write_text(json.dumps(after))
         self.assertFalse(self.request('unlock', password=PASSWORD)['ok'])
 
+    def test_formatted_note_and_draft_roundtrip_preserves_code_whitespace(self):
+        created = self.create()
+        text = '\n    🔐print("hello")\n  '
+        ranges = [{'type': 'code', 'start': 0, 'end': len(text)},
+                  {'type': 'bold', 'start': 5, 'end': 6}]
+        note = {**NOTE, 'text': text, 'format': ranges}
+        draft = {'id': note['id'], 'text': text, 'format': ranges}
+        saved = self.save(created, [note], draft)
+        self.assertTrue(saved['ok'], saved)
+        envelope = json.loads(self.path.read_bytes())
+        self.assertEqual(set(envelope), {'version', 'kdf', 'salt', 'nonce', 'ciphertext'})
+        self.assertNotIn(b'format', self.path.read_bytes())
+        self.assertNotIn(text.encode(), self.path.read_bytes())
+        unlocked = self.request('unlock', password=PASSWORD)
+        self.assertTrue(unlocked['ok'], unlocked)
+        self.assertEqual(unlocked['notes'], [note])
+        self.assertEqual(unlocked['draft'], draft)
+        cleared = self.save(unlocked, [{**note, 'format': []}], {'id': None, 'text': '', 'format': []})
+        self.assertTrue(cleared['ok'], cleared)
+        unlocked = self.request('unlock', password=PASSWORD)
+        self.assertEqual(unlocked['notes'][0]['format'], [])
+        self.assertEqual(unlocked['draft']['format'], [])
+        max_ranges = [{'type': 'italic', 'start': 0, 'end': 1}] * 2000
+        self.assertTrue(self.save(unlocked, [{**note, 'format': max_ranges}])['ok'])
+
+    def test_format_rejects_malformed_ranges_without_replacing_ciphertext(self):
+        created = self.create()
+        original = self.path.read_bytes()
+        invalid = [None, {}, 'bold', [None],
+                   [{'type': 'unknown', 'start': 0, 'end': 1}],
+                   [{'type': 'bold', 'start': 0}],
+                   [{'type': 'bold', 'start': 0, 'end': 1, 'extra': True}],
+                   [{'type': 'bold', 'start': True, 'end': 2}],
+                   [{'type': 'bold', 'start': 0, 'end': False}],
+                   [{'type': 'bold', 'start': 0.0, 'end': 1}],
+                   [{'type': 'bold', 'start': -1, 'end': 1}],
+                   [{'type': 'bold', 'start': 1, 'end': 1}],
+                   [{'type': 'bold', 'start': 2, 'end': 1}],
+                   [{'type': 'bold', 'start': 0, 'end': 3}],
+                   [{'type': 'italic', 'start': 0, 'end': 1}] * 2001]
+        for ranges in invalid:
+            with self.subTest(format=ranges if len(str(ranges)) < 200 else 'oversized'):
+                # Two codepoints, three UTF-16 units: end=3 must be rejected.
+                note = {**NOTE, 'text': '🔐x', 'format': ranges}
+                self.assertFalse(self.save(created, [note])['ok'])
+                draft = {'id': None, 'text': '🔐x', 'format': ranges}
+                self.assertFalse(self.save(created, [NOTE], draft)['ok'])
+                self.assertEqual(self.path.read_bytes(), original)
+
+    def test_formatted_text_retains_utf16_note_and_draft_limits(self):
+        created = self.create()
+        text = '🔐' * 5000
+        ranges = [{'type': 'code', 'start': 0, 'end': 5000}]
+        note = {**NOTE, 'text': text, 'format': ranges}
+        saved = self.save(created, [note], {'id': None, 'text': text, 'format': ranges})
+        self.assertTrue(saved['ok'], saved)
+        current = self.path.read_bytes()
+        self.assertFalse(self.save(saved, [{**note, 'text': text + 'x'}])['ok'])
+        self.assertFalse(self.save(saved, [note], {'id': None, 'text': text + 'x', 'format': ranges})['ok'])
+        self.assertFalse(self.save(saved, [{**note, 'text': '   ', 'format': [{'type': 'code', 'start': 0, 'end': 3}]}])['ok'])
+        self.assertEqual(self.path.read_bytes(), current)
+
+    def test_authenticated_invalid_format_is_rejected_when_unlocking(self):
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+        created = self.create()
+        envelope = json.loads(self.path.read_bytes())
+        salt = base64.b64decode(envelope['salt'])
+        nonce = base64.b64decode(envelope['nonce'])
+        key = base64.b64decode(created['key'])
+        header = b'Dayline private notes\x00version=1;scrypt=131072,8,1;AES-256-GCM\x00'
+        invalid = [{'notes': [{**NOTE, 'format': [{'type': 'code', 'start': 0, 'end': 999}]}], 'draft': None},
+                   {'notes': [NOTE], 'draft': {'id': None, 'text': 'draft', 'format': None}}]
+        for malformed in invalid:
+            envelope['ciphertext'] = base64.b64encode(AESGCM(key).encrypt(nonce, json.dumps(malformed).encode(), header + salt)).decode()
+            self.path.write_text(json.dumps(envelope))
+            self.assertFalse(self.request('unlock', password=PASSWORD)['ok'])
+
     def test_wrong_password_and_tampering_have_same_error_and_block_writes(self):
         created = self.create()
         original = self.path.read_bytes()

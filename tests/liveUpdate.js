@@ -59,6 +59,20 @@ export async function run() {
     if (record.stateObj.panel) throw new Error('Inactive update test must begin with disabled extension');
     await activateUpdate(record, GLib.getenv('DAYLINE_UPDATE_RUNTIME'));
     if (!record.stateObj.panel || !settings.get_string('appearance') || !global.settings.get_strv('enabled-extensions').includes(record.uuid)) throw new Error('Update must directly enable a fresh runtime from a disabled extension and persist enabled state');
+    const nextRuntime = GLib.getenv('DAYLINE_UPDATE_RUNTIME_NEXT');
+    if (nextRuntime) {
+        const firstRichRuntime = record.stateObj;
+        firstRichRuntime.add('notes', 'Formatted runtime update', null, [{type: 'bold', start: 0, end: 9}]);
+        await activateUpdate(record, nextRuntime);
+        if (record.stateObj === firstRichRuntime || record.stateObj.store.data.notes[0].format[0].type !== 'bold')
+            throw new Error('A second rich runtime URL must load and preserve formatted storage');
+        record.stateObj.panel.menu.open();
+        record.stateObj.panel.openDetails('notes', record.stateObj.store.data.notes[0]);
+        await Scripting.sleep(250);
+        if (!record.stateObj.panel.editor.getFormat().some(range => range.type === 'bold'))
+            throw new Error('Fresh runtime must create its own document overlays and restore styles');
+        await Main.extensionManager.disableExtension(record.uuid);
+    }
     await Scripting.sleep(200);
     print('PASS: live update from original 0.1.0, inline/expanded guards, draft preservation, rollback and direct inactive activation');
 }

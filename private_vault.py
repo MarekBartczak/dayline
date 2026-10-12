@@ -25,8 +25,8 @@ class VaultError(Exception):
     pass
 
 
-def exact_keys(value, keys):
-    if type(value) is not dict or set(value) != set(keys):
+def exact_keys(value, keys, optional=()):
+    if type(value) is not dict or not set(keys) <= set(value) or not set(value) <= set(keys) | set(optional):
         raise VaultError('Invalid private vault data.')
 
 
@@ -54,17 +54,30 @@ def text_length(value):
     return len(value.encode('utf-16-le')) // 2
 
 
+def validate_format(text, ranges):
+    if type(ranges) is not list or len(ranges) > 2000:
+        raise VaultError('Invalid private note formatting.')
+    for item in ranges:
+        exact_keys(item, ['type', 'start', 'end'])
+        if item['type'] not in ('bold', 'italic', 'code') or \
+                type(item['start']) is not int or type(item['end']) is not int or \
+                not 0 <= item['start'] < item['end'] <= len(text):
+            raise VaultError('Invalid private note formatting.')
+
+
 def validate_notes(notes, draft):
     if type(notes) is not list or len(notes) > 10000:
         raise VaultError('Private notes must contain at most 10,000 entries.')
     ids = set()
     for note in notes:
-        exact_keys(note, ['id', 'text', 'createdAt'])
+        exact_keys(note, ['id', 'text', 'createdAt'], ['format'])
         if not 0 < text_length(note['id']) <= 128 or note['id'] in ids:
             raise VaultError('Invalid or duplicate private note ID.')
         ids.add(note['id'])
         if not note['text'].strip() or text_length(note['text']) > 10000:
             raise VaultError('Private notes must contain between 1 and 10,000 characters.')
+        if 'format' in note:
+            validate_format(note['text'], note['format'])
         timestamp = note['createdAt']
         if type(timestamp) is not str or not re.match(r'^\d{4}-\d{2}-\d{2}T', timestamp):
             raise VaultError('Invalid private note creation date.')
@@ -73,11 +86,13 @@ def validate_notes(notes, draft):
         except ValueError:
             raise VaultError('Invalid private note creation date.') from None
     if draft is not None:
-        exact_keys(draft, ['id', 'text'])
+        exact_keys(draft, ['id', 'text'], ['format'])
         if draft['id'] is not None and (type(draft['id']) is not str or draft['id'] not in ids):
             raise VaultError('The private draft must refer to an existing note or a new note.')
         if text_length(draft['text']) > 10000:
             raise VaultError('Private drafts must contain at most 10,000 characters.')
+        if 'format' in draft:
+            validate_format(draft['text'], draft['format'])
     return {'notes': notes, 'draft': draft}
 
 

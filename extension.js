@@ -70,13 +70,15 @@ export default class DaylineExtension extends Extension {
         if (!this.deleted) this.panel.message.hide();
     }
 
-    add(kind, text, date) {
+    add(kind, text, date, format = undefined) {
         const item = {id: GLib.uuid_string_random(), text, createdAt: new Date().toISOString()};
+        if (format !== undefined) item.format = format;
         this.commit(data => kind === 'notes' ? addNote(data, item) : addTask(data, {...item, date}));
     }
 
-    edit(kind, id, text, date) {
-        this.commit(data => kind === 'notes' ? updateNote(data, id, {text}) : updateTask(data, id, {text, date}));
+    edit(kind, id, text, date, format = undefined) {
+        const patch = format === undefined ? {text} : {text, format};
+        this.commit(data => kind === 'notes' ? updateNote(data, id, patch) : updateTask(data, id, {...patch, date}));
     }
 
     toggle(id) {
