@@ -1,0 +1,14 @@
+{
+  "name": "dayline",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A quiet place for your day, in the GNOME top bar.",
+  "scripts": {
+    "test": "node --test tests/model.test.js",
+    "test:storage": "gjs -m tests/storage.js",
+    "check": "bash scripts/check.sh",
+    "package": "bash scripts/package.sh",
+    "install:extension": "bash scripts/install.sh"
+  }
+}

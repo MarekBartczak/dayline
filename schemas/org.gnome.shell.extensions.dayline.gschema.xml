@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.dayline" path="/org/gnome/shell/extensions/dayline/">
+    <key name="appearance" type="s">
+      <choices><choice value="system"/><choice value="light"/><choice value="dark"/></choices>
+      <default>'system'</default>
+      <summary>Popup appearance</summary>
+    </key>
+  </schema>
+</schemalist>

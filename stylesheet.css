@@ -1,0 +1,122 @@
+.dayline-status { spacing: 6px; }
+.dayline-counter { font-size: 12px; font-weight: 700; }
+.dayline-menu { -arrow-background-color: #20212d; -arrow-border-color: #393a4b; -arrow-border-width: 1px; -arrow-border-radius: 22px; -arrow-rise: 8px; }
+.dayline-menu .popup-menu-content { background-color: transparent; border: none; box-shadow: none; padding: 0; }
+.dayline-popup { width: 420px; padding: 22px; spacing: 18px; color: #eeedf6; font-size: 13px; }
+.dayline-heading { spacing: 12px; }
+.dayline-brand { spacing: 4px; }
+.dayline-brand-name { font-size: 23px; font-weight: 800; letter-spacing: -0.5px; }
+.dayline-muted { color: #9999af; font-size: 12px; }
+.dayline-summary { background-color: #2c293f; border: 1px solid #423954; border-radius: 16px; padding: 14px 16px; spacing: 12px; }
+.dayline-summary-line { spacing: 12px; }
+.dayline-summary-count { spacing: 9px; }
+.dayline-big-count { color: #c5b6ff; font-size: 32px; font-weight: 800; }
+.dayline-summary-caption { color: #c5b6ff; font-size: 13px; }
+.dayline-progress-label { color: #b5aaca; font-size: 11px; }
+.dayline-progress-track { height: 4px; background-color: #474054; border-radius: 2px; }
+.dayline-progress-fill { background-color: #b49bff; border-radius: 2px; }
+.dayline-tabs { spacing: 4px; background-color: #181923; border-radius: 12px; padding: 4px; }
+.dayline-tab { color: #a2a1b7; border-radius: 9px; padding: 9px 10px; font-weight: 600; }
+.dayline-tab:hover { color: #eeedf6; background-color: #30303e; }
+.dayline-tab-active { background-color: #3c3454; color: #d6c9ff; }
+.dayline-tab-active:hover { background-color: #493e65; }
+.dayline-content { spacing: 7px; }
+.dayline-scroll { max-height: 430px; }
+.dayline-section-heading { spacing: 8px; padding: 10px 4px 5px; }
+.dayline-section-title, .dayline-caption { color: #9999af; font-size: 10px; font-weight: 700; letter-spacing: 1px; }
+.dayline-section-count { color: #bfbcd0; font-size: 10px; background-color: #363642; border-radius: 7px; padding: 2px 6px; }
+.dayline-task { spacing: 10px; background-color: #282935; border: 1px solid #323340; border-radius: 12px; padding: 11px 10px; }
+.dayline-task-done { background-color: #23242e; border-color: #2d2e39; }
+.dayline-task-text { spacing: 5px; }
+.dayline-task-text-button { padding: 0; border-radius: 4px; text-align: left; }
+.dayline-task-text-button:hover { color: #d1bfff; }
+.dayline-task-text-button:focus { background-color: #3a334e; }
+.dayline-done-text { color: #848498; }
+.dayline-check { width: 16px; height: 16px; padding: 2px; border: 1.5px solid #646274; border-radius: 6px; margin-top: 1px; }
+.dayline-check:hover, .dayline-check:focus { border-color: #c4afff; background-color: #423756; }
+.dayline-check-done { background-color: #7861b9; border-color: #7861b9; color: #ffffff; }
+.dayline-overdue-date { color: #dfa78e; font-size: 10px; }
+.dayline-note { spacing: 10px; padding: 14px 10px; border-radius: 12px; background-color: #292732; border: 1px solid #39333e; }
+.dayline-note-icon { color: #c5acd7; padding-top: 2px; }
+.dayline-icon-button { border-radius: 8px; padding: 5px; color: #9c9aad; }
+.dayline-icon-button:hover, .dayline-icon-button:focus { color: #e5dafb; background-color: #3c354d; }
+.dayline-add { background-color: #b8a0f4; color: #211932; padding: 9px; border-radius: 9px; }
+.dayline-add:hover, .dayline-add:focus { background-color: #c9b4ff; color: #211932; }
+.dayline-empty { spacing: 9px; padding: 22px 20px; }
+.dayline-empty-icon { color: #a990df; padding-bottom: 5px; }
+.dayline-empty-title { font-size: 14px; font-weight: 600; }
+.dayline-hint { color: #828295; font-size: 10px; }
+.dayline-composer-area { spacing: 9px; border-top: 1px solid #353540; padding-top: 16px; }
+.dayline-composer { spacing: 5px; }
+.dayline-entry, .dayline-textarea { color: #eeedf6; background-color: #171822; border: 1px solid #424153; border-radius: 10px; padding: 10px 12px; selection-background-color: #6d549f; selected-color: #ffffff; }
+.dayline-entry:focus, .dayline-textarea:focus { border-color: #b49bff; box-shadow: none; }
+.dayline-entry StLabel { color: #8e8b9f; }
+.dayline-textarea { min-height: 105px; }
+.dayline-calendar { spacing: 10px; padding: 2px 0 10px; }
+.dayline-calendar-header { spacing: 8px; }
+.dayline-calendar-title { font-size: 14px; font-weight: 700; }
+.dayline-weekday { color: #87879c; padding: 4px; font-size: 10px; }
+.dayline-day { width: 47px; padding: 7px 0 4px; border-radius: 10px; border: 1px solid transparent; }
+.dayline-day:hover, .dayline-day:focus { background-color: #373244; }
+.dayline-day-content { spacing: 4px; }
+.dayline-day-outside { color: #656577; }
+.dayline-day-today { border-color: #8d77b7; }
+.dayline-day-selected { background-color: #b8a0f4; color: #251b36; font-weight: 700; }
+.dayline-day-selected:hover { background-color: #c9b4ff; }
+.dayline-dot { width: 3px; height: 3px; border-radius: 2px; background-color: transparent; }
+.dayline-dot-active { background-color: #b8a0f4; }
+.dayline-day-selected .dayline-dot-active { background-color: #372347; }
+.dayline-editor { spacing: 12px; padding: 4px 0; }
+.dayline-editor-heading { spacing: 8px; padding-bottom: 5px; }
+.dayline-editor-title { font-size: 16px; font-weight: 700; }
+.dayline-date-editor { spacing: 6px; }
+.dayline-date-shortcuts { spacing: 7px; }
+.dayline-editor-actions { spacing: 9px; padding-top: 5px; }
+.dayline-primary { background-color: #b8a0f4; color: #251b36; padding: 10px 16px; border-radius: 10px; font-weight: 700; }
+.dayline-primary:hover, .dayline-primary:focus { background-color: #c9b4ff; }
+.dayline-secondary, .dayline-chip { padding: 7px 12px; color: #c7badb; background-color: #37303f; border-radius: 8px; }
+.dayline-secondary:hover, .dayline-chip:hover, .dayline-secondary:focus, .dayline-chip:focus { background-color: #4c3f5f; }
+.dayline-message { spacing: 8px; padding: 10px; border-radius: 10px; background-color: #3b3047; }
+.dayline-message-text { font-size: 11px; color: #e1cdeb; }
+
+.dayline-light { -arrow-background-color: #faf9fd; -arrow-border-color: #dddae8; }
+.dayline-light .dayline-popup { color: #2c2938; }
+.dayline-light .dayline-muted, .dayline-light .dayline-section-title, .dayline-light .dayline-caption { color: #777184; }
+.dayline-light .dayline-summary { background-color: #f0eafb; border-color: #ded3f2; }
+.dayline-light .dayline-big-count, .dayline-light .dayline-summary-caption { color: #7251b3; }
+.dayline-light .dayline-progress-label { color: #8c78a9; }
+.dayline-light .dayline-progress-track { background-color: #ded3ee; }
+.dayline-light .dayline-progress-fill { background-color: #9873d8; }
+.dayline-light .dayline-tabs { background-color: #eeecf3; }
+.dayline-light .dayline-tab { color: #81778f; }
+.dayline-light .dayline-tab:hover { background-color: #e2dbea; color: #5e477d; }
+.dayline-light .dayline-tab-active { background-color: #ffffff; color: #7350ad; }
+.dayline-light .dayline-task { background-color: #ffffff; border-color: #e4e0eb; }
+.dayline-light .dayline-task-done { background-color: #f3f1f6; }
+.dayline-light .dayline-task-text-button:hover { color: #7350ad; }
+.dayline-light .dayline-task-text-button:focus { background-color: #eee6f8; }
+.dayline-light .dayline-done-text { color: #9a92a5; }
+.dayline-light .dayline-check { border-color: #bab1c7; }
+.dayline-light .dayline-check:hover, .dayline-light .dayline-check:focus { background-color: #e9dff7; border-color: #9873d8; }
+.dayline-light .dayline-check-done { background-color: #9873d8; border-color: #9873d8; }
+.dayline-light .dayline-note { background-color: #f8f3fc; border-color: #e9deef; }
+.dayline-light .dayline-note-icon { color: #9d78b2; }
+.dayline-light .dayline-icon-button { color: #95899f; }
+.dayline-light .dayline-icon-button:hover, .dayline-light .dayline-icon-button:focus { color: #74539c; background-color: #eae0f3; }
+.dayline-light .dayline-add, .dayline-light .dayline-primary { background-color: #9873d8; color: #ffffff; }
+.dayline-light .dayline-add:hover, .dayline-light .dayline-primary:hover { background-color: #8461c2; }
+.dayline-light .dayline-entry, .dayline-light .dayline-textarea { background-color: #ffffff; color: #2c2938; border-color: #dcd4e6; }
+.dayline-light .dayline-entry:focus, .dayline-light .dayline-textarea:focus { border-color: #9873d8; }
+.dayline-light .dayline-entry StLabel { color: #aaa0b4; }
+.dayline-light .dayline-composer-area { border-color: #e4deec; }
+.dayline-light .dayline-section-count { color: #887a99; background-color: #ede7f3; }
+.dayline-light .dayline-overdue-date { color: #b77d55; }
+.dayline-light .dayline-day:hover, .dayline-light .dayline-day:focus { background-color: #eae1f3; }
+.dayline-light .dayline-day-outside { color: #bdb5c9; }
+.dayline-light .dayline-day-selected { background-color: #9873d8; color: #ffffff; }
+.dayline-light .dayline-day-selected:hover { background-color: #8461c2; }
+.dayline-light .dayline-day-selected .dayline-dot-active { background-color: #ffffff; }
+.dayline-light .dayline-secondary, .dayline-light .dayline-chip { background-color: #eee5f5; color: #7a579d; }
+.dayline-light .dayline-secondary:hover, .dayline-light .dayline-chip:hover { background-color: #e2d3ee; }
+.dayline-light .dayline-message { background-color: #f1e6f8; }
+.dayline-light .dayline-message-text { color: #825c9b; }
