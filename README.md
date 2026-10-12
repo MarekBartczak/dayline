@@ -2,7 +2,7 @@
 
 Dayline is a native GNOME Shell extension for tasks and notes. The top bar shows how many tasks are in progress and how many are waiting today. Open the panel to plan a day, write a note, or keep instructions beside the app you are working in.
 
-**Version 0.3.0 · GNOME Shell 50 · Local storage · MIT license**
+**Version 0.3.1 · GNOME Shell 50 · Local storage · MIT license**
 
 <table>
   <tr>
@@ -176,10 +176,12 @@ DAYLINE_TEST_SCRIPT="$PWD/tests/singlePanel.js" bash scripts/test-shell.sh
 DAYLINE_TEST_SCRIPT="$PWD/tests/pointerInput.js" bash scripts/test-shell.sh
 DAYLINE_TEST_SCRIPT="$PWD/tests/richFormatting.js" bash scripts/test-shell.sh
 DAYLINE_TEST_SCRIPT="$PWD/tests/formatDrafts.js" bash scripts/test-shell.sh
+DAYLINE_TEST_SCRIPT="$PWD/tests/formatPointer.js" bash scripts/test-shell.sh
+DAYLINE_TEST_SCRIPT="$PWD/tests/formatHitArea.js" bash scripts/test-shell.sh
 DAYLINE_TEST_SCRIPT="$PWD/tests/longEditor.js" bash scripts/test-shell.sh
 ```
 
-These run in isolated GNOME sessions with temporary XDG data, settings and runtime directories. They cover Private locking, panel transitions and opacity, real pointer input, selection formatting and code copying, formatted drafts, and long-text scrolling and caret behavior. They do not use your Dayline data or desktop extension settings.
+These run in isolated GNOME sessions with temporary XDG data, settings and runtime directories. They cover Private locking, panel transitions and opacity, real pointer input, mouse-drag selection and formatting after scrolling, code copying, formatted drafts, and long-text scrolling and caret behavior. Repeat the formatting pointer checks with `DAYLINE_TEST_PINNED=0` to test the unpinned panel. They do not use your Dayline data or desktop extension settings.
 
 Capture the standard screenshot set with:
 

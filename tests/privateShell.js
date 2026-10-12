@@ -235,5 +235,11 @@ export async function run() {
     assert(next.app.vault.draft.text === 'Synthetic disabled-extension draft', 'Disable preserves encrypted draft');
     next.menu.close();
     await settle(next);
+    const finalController = next.privateNotes;
+    const finalVault = next.app.vault;
+    await Main.extensionManager.disableExtension(uuid);
+    await finalController.closing;
+    await finalVault.whenIdle();
+    await Scripting.sleep(200);
     print('PASS: native Private tab, pointer rich formatting, encryption isolation, pin/expand, formatted encrypted drafts, pending unlock/save, close/screen lock and disable lifecycle');
 }
