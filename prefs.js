@@ -23,7 +23,7 @@ export default class DaylinePreferences extends ExtensionPreferences {
         accent.connect('notify::selected', () => settings.set_string('accent', accents[accent.selected]));
         appearanceGroup.add(accent);
 
-        const opacity = new Adw.SpinRow({title: 'Background opacity', subtitle: '20–100%. Text stays fully readable.', adjustment: new Gtk.Adjustment({lower: 20, upper: 100, step_increment: 5, page_increment: 10}), digits: 0});
+        const opacity = new Adw.SpinRow({title: 'Window opacity', subtitle: '20–100%. Fade the entire popup, including text and controls.', adjustment: new Gtk.Adjustment({lower: 20, upper: 100, step_increment: 5, page_increment: 10}), digits: 0});
         settings.bind('opacity', opacity, 'value', Gio.SettingsBindFlags.DEFAULT);
         appearanceGroup.add(opacity);
 
@@ -87,7 +87,7 @@ export default class DaylinePreferences extends ExtensionPreferences {
             });
         });
         const info = new Adw.PreferencesGroup({title: 'A small tool. A clearer mind.'});
-        info.add(new Adw.ActionRow({title: 'Dayline 0.2.0', subtitle: 'The counter includes only unfinished tasks for today.\nOverdue tasks appear in their own section.'}));
+        info.add(new Adw.ActionRow({title: 'Dayline 0.2.2', subtitle: 'The counter includes only unfinished tasks for today.\nOverdue tasks appear in their own section.'}));
         page.add(info);
     }
 }

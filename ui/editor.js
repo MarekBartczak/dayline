@@ -6,17 +6,19 @@ import {localDate, shiftDate, MAX_TASK_TEXT, MAX_NOTE_TEXT} from '../model.js';
 import {box, label, button, iconButton} from './widgets.js';
 import {calendar} from './calendar.js';
 
-export function editor(kind, item, initialText, initialDate, data, onSave, onCancel, onError, onExpand) {
+export function editor(kind, item, initialText, initialDate, data, onSave, onCancel, onError, onExpand, options = {}) {
     const root = box(true, 'dayline-editor');
     const header = box(false, 'dayline-editor-heading');
-    header.add_child(iconButton('Back to list', 'go-previous-symbolic', onCancel));
-    const title = label(item ? 'Edit entry' : kind === 'notes' ? 'New note' : 'New task', 'dayline-editor-title');
+    if (!options.detached) header.add_child(iconButton('Back to list', 'go-previous-symbolic', onCancel));
+    const title = label(options.title ?? (item ? 'Edit entry' : kind === 'notes' ? 'New note' : 'New task'), 'dayline-editor-title');
     title.x_expand = true;
     header.add_child(title);
+    if (options.pinButton) header.add_child(options.pinButton);
     const expand = iconButton('Expand editor', null, onExpand);
     // Resolve against this module's runtime directory, including live snapshots.
     expand.set_child(new St.Icon({gicon: Gio.icon_new_for_string(Gio.File.new_for_uri(import.meta.url).get_parent().get_parent().get_child('icons/expand-symbolic.svg').get_path()), icon_size: 16}));
     header.add_child(expand);
+    if (options.detached) header.add_child(iconButton('Close entry window', 'window-close-symbolic', options.onClose ?? onCancel));
     root.add_child(header);
     root.add_child(label('DETAILS', 'dayline-caption'));
     const text = new St.Entry({text: item?.text ?? initialText, style_class: 'dayline-textarea', can_focus: true, x_expand: true, accessible_name: 'Entry text'});
@@ -92,10 +94,10 @@ export function editor(kind, item, initialText, initialDate, data, onSave, onCan
     submit.x_expand = true;
     actions.add_child(submit);
     root.add_child(actions);
-    root.add_child(label('Ctrl + Enter to save · Esc to go back', 'dayline-hint'));
+    root.add_child(label(options.detached ? 'Ctrl + Enter to save · Esc to close' : 'Ctrl + Enter to save · Esc to go back', 'dayline-hint'));
     text.clutter_text.connect('key-press-event', (_actor, event) => {
         if (event.get_key_symbol() === Clutter.KEY_Escape) {
-            onCancel();
+            (options.onClose ?? onCancel)();
             return Clutter.EVENT_STOP;
         }
         if (event.get_key_symbol() === Clutter.KEY_Return && (event.get_state() & Clutter.ModifierType.CONTROL_MASK)) {

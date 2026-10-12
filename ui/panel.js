@@ -9,8 +9,9 @@ import {todaySummary, tasksForDate, overdueTasks, localDate, MAX_TASK_TEXT, MAX_
 import {box, label, button, iconButton, emptyState, sectionHeading, formatDate} from './widgets.js';
 import {calendar} from './calendar.js';
 import {editor} from './editor.js';
-import {resolveAccent, backgroundColor} from './appearance.js';
+import {resolveAccent, backgroundColor, windowOpacity} from './appearance.js';
 import {PrivateNotes} from './privateNotes.js';
+import {EntryWindow} from './entryWindow.js';
 
 export const DaylinePanel = GObject.registerClass({
     // Fresh runtime snapshots can coexist with the previous GObject type.
@@ -22,6 +23,7 @@ export const DaylinePanel = GObject.registerClass({
         this.tab = 'today';
         this.selectedDate = app.today;
         this.drafts = new Map();
+        this.entryDrafts = new Map();
         this.expanded = false;
         const status = box(false, 'dayline-status');
         status.add_child(new St.Icon({gicon: Gio.icon_new_for_string(`${app.path}/icons/dayline-symbolic.svg`), style_class: 'system-status-icon'}));
@@ -58,7 +60,7 @@ export const DaylinePanel = GObject.registerClass({
             tabs.add_child(tab);
         }
         this.root.add_child(tabs);
-        this.scroll = new St.ScrollView({style_class: 'dayline-scroll', x_expand: true, overlay_scrollbars: true, hscrollbar_policy: St.PolicyType.NEVER, vscrollbar_policy: St.PolicyType.AUTOMATIC});
+        this.scroll = new St.ScrollView({style_class: 'dayline-scroll', x_expand: true, overlay_scrollbars: false, hscrollbar_policy: St.PolicyType.NEVER, vscrollbar_policy: St.PolicyType.AUTOMATIC});
         this.body = box(true, 'dayline-content');
         this.scroll.set_child(this.body);
         this.root.add_child(this.scroll);
@@ -179,6 +181,21 @@ export const DaylinePanel = GObject.registerClass({
         this.editor.text.grab_key_focus();
     }
 
+    openDetails(kind, item) {
+        const current = this.app.store.data[kind].find(entry => entry.id === item.id);
+        if (!current) { this.showMessage('This entry no longer exists.'); return; }
+        this.details?.close();
+        if (!this.pinning?.pinned) this.menu.close();
+        this.details = new EntryWindow(this, kind, current);
+    }
+
+    entryWindowButton(kind, item) {
+        const control = iconButton(`Open ${kind === 'tasks' ? 'task' : 'note'} in separate window: ${item.text}`, null, () => this.openDetails(kind, item));
+        control.set_child(new St.Icon({gicon: Gio.icon_new_for_string(`${this.app.path}/icons/expand-symbolic.svg`), icon_size: 16}));
+        control.y_align = Clutter.ActorAlign.START;
+        return control;
+    }
+
     taskRow(item, overdue = false) {
         const row = box(false, item.done ? 'dayline-task dayline-task-done' : 'dayline-task');
         const check = button(`${item.done ? 'Reopen' : 'Complete'}: ${item.text}`, () => this.app.toggle(item.id), `dayline-check ${item.done ? 'dayline-check-done' : ''}`,
@@ -204,6 +221,7 @@ export const DaylinePanel = GObject.registerClass({
             start.y_align = Clutter.ActorAlign.START;
             row.add_child(start);
         }
+        row.add_child(this.entryWindowButton('tasks', item));
         const remove = iconButton('Delete task', 'user-trash-symbolic', () => this.app.remove('tasks', item.id));
         remove.y_align = Clutter.ActorAlign.START;
         row.add_child(remove);
@@ -251,6 +269,7 @@ export const DaylinePanel = GObject.registerClass({
             const preview = item.text.length > 220 ? `${item.text.slice(0, 220)}…` : item.text;
             edit.set_child(label(preview, '', true));
             row.add_child(edit);
+            row.add_child(this.entryWindowButton('notes', item));
             const remove = iconButton('Delete note', 'user-trash-symbolic', () => this.app.remove('notes', item.id));
             remove.y_align = Clutter.ActorAlign.START;
             row.add_child(remove);
@@ -268,8 +287,13 @@ export const DaylinePanel = GObject.registerClass({
         this.accentName = accent.name;
         this.menu.actor.add_style_class_name(`dayline-accent-${accent.name}`);
         const styles = (this.menu.actor.get_style() ?? '').split(';').map(part => part.trim()).filter(part => part && !part.startsWith('-arrow-background-color:'));
-        styles.push(`-arrow-background-color: ${backgroundColor(accent, light, this.app.settings.get_int('opacity'))}`);
+        styles.push(`-arrow-background-color: ${backgroundColor(accent, light)}`);
         this.menu.actor.set_style(`${styles.join('; ')};`);
+        // BoxPointer's opening animation otherwise fades back to 255 after
+        // open-state-changed. Keep its size/slide animation, own only opacity.
+        if (this.menu.isOpen) this.menu.actor.remove_transition('opacity');
+        this.menu.actor.opacity = windowOpacity(this.app.settings.get_int('opacity'));
+        this.details?.updateTheme();
     }
 
     refresh() {

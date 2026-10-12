@@ -55,7 +55,7 @@ app.connect('activate', () => {
             const group = title => widgets.find(widget => widget instanceof Adw.PreferencesGroup && widget.title === title);
             assert(group('Appearance'), 'Appearance group must be in English');
             assert(group('Data and backups'), 'Backup group must be in English');
-            for (const title of ['Export backup', 'Import or restore backup', 'Open data folder', 'Dayline 0.2.0'])
+            for (const title of ['Export backup', 'Import or restore backup', 'Open data folder'])
                 assert(row(title), `Missing English preferences label: ${title}`);
 
             const appearance = row('Panel appearance');
@@ -75,16 +75,18 @@ app.connect('activate', () => {
                 assert(settings.get_string('accent') === value, `Accent selection must save: ${value}`);
             }
 
-            const opacity = row('Background opacity');
+            const opacity = row('Window opacity');
             assert(opacity instanceof Adw.SpinRow, 'Opacity must offer a spin control');
+            assert(opacity.subtitle === '20–100%. Fade the entire popup, including text and controls.', 'Opacity explanation must describe the entire popup');
             assert(opacity.adjustment.lower === 20 && opacity.adjustment.upper === 100, 'Opacity must be bounded to 20–100 percent');
-            assert(settings.get_int('opacity') === 100 && opacity.value === 100, 'Background must default to full opacity');
+            assert(settings.get_int('opacity') === 100 && opacity.value === 100, 'Window must default to full opacity');
             opacity.value = 20;
             assert(settings.get_int('opacity') === 20, 'Opacity control must save');
             settings.set_int('opacity', 65);
             assert(opacity.value === 65, 'Opacity must follow external settings updates');
             opacity.value = 100;
             assert(settings.get_int('opacity') === 100, 'Maximum opacity must save');
+            assert(row('Dayline 0.2.2'), 'Preferences must show the current release');
 
             const compact = row('Compact layout');
             assert(compact instanceof Adw.SwitchRow, 'Compact layout must offer a switch');

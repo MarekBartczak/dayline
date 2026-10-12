@@ -56,6 +56,11 @@ export function attachPin(panel) {
         const focus = global.stage.get_key_focus();
         if (focus && menu.actor.contains(focus)) global.stage.set_key_focus(null);
     });
+    const focusId = global.display.connect('notify::focus-window', () => {
+        if (!control.pinned || !menu.isOpen || !global.display.focus_window) return;
+        const focus = global.stage.get_key_focus();
+        if (focus && menu.actor.contains(focus)) global.stage.set_key_focus(null);
+    });
     menu.actor.connect('key-press-event', (_actor, event) => {
         if (control.pinned && !panel.editor && event.get_key_symbol() === Clutter.KEY_Escape) {
             menu.close(BoxPointer.PopupAnimation.FULL);
@@ -65,6 +70,7 @@ export function attachPin(panel) {
     });
     menu.connect('destroy', () => {
         menu.disconnect(stateId);
+        global.display.disconnect(focusId);
         panel.pinning = null;
     });
     panel.pinning = control;

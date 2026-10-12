@@ -17,11 +17,12 @@ See how many tasks are left **today** without opening an app. Click to plan a da
 - **Notes** — undated notes for ideas, reminders, and details to add to a project.
 - **Private** — a fourth tab for encrypted notes, protected by a separate password and automatically locked when the panel closes or the screen locks.
 - **Edit and reschedule** — click a task or note; the editor supports multiple lines and a date picker.
+- **Separate entry window** — overlapping rectangles on a task or ordinary note open only that entry in a floating editor, with its own pin, close button and size toggle. The main list keeps its size; closing retains an unfinished draft for reopening in the same session.
 - **Delete with undo** — restore the last deleted task or ordinary note while the extension remains enabled.
 - **Pin to screen** — keep the panel visible while working in other apps. Copy elsewhere, return and paste without losing your editor.
 - **Compact by default** — overlapping rectangles in the editor smoothly switch to a larger workspace, preserving text and pin state.
 - **Light, dark, or system appearance**, with System accent, Ubuntu Orange, Violet, Blue, Green and Rose.
-- **Background opacity** — adjustable from 20–100% in Settings; text remains fully readable.
+- **Window opacity** — adjustable from 20–100% in Settings; the entire popup fades uniformly, including its cards, text and controls. Separate entry windows use the same setting.
 - **Offline storage**, atomic saves, previous-version backup, and explicit JSON import/export.
 
 No account, server, network requests, tracking, or runtime npm dependencies. The interface is in **English**. Your own task and note text is kept exactly as you wrote it. GNOME **50** is the supported and tested version; other Shell versions are not declared compatible.
@@ -63,8 +64,9 @@ sudo apt-get install python3-cryptography
 6. Click an entry to edit it. The pencil beside the input opens a larger editor for a new entry. **Ctrl + Enter** saves; **Esc** leaves the editor.
 7. Click the pin beside the gear to keep the panel on screen. Unpin restores ordinary click-outside dismissal; the close button hides a pinned panel.
 8. In the editor, click the overlapping rectangles to expand or compact it.
-9. Click the play button on an unfinished task to mark it **In progress**; pause moves it back to waiting. The checkbox completes it.
-10. Open the gear menu for colors, background opacity, compact layout, and backups.
+9. On a task or ordinary note card, click the overlapping rectangles to open a separate editor. Pin that window while copying from other apps; Save updates only that entry.
+10. Click the play button on an unfinished task to mark it **In progress**; pause moves it back to waiting. The checkbox completes it.
+11. Open the gear menu for colors, window opacity, compact layout, and backups.
 
 The two top-bar counters show today's in-progress and waiting tasks. They exclude completed, future, and overdue tasks. Overdue tasks retain their original dates until you complete or reschedule them. Changes are saved as soon as you add, save, complete, delete, or undo an entry. Editor text is saved only when you press Save.
 
@@ -75,7 +77,7 @@ The two top-bar counters show today's in-progress and waiting tasks. They exclud
 
 ## Update without logging out
 
-Run `bash scripts/install.sh`, then save or cancel any active editor. Open GNOME Looking Glass with **Alt + F2**, type `lg`, and paste this into **Evaluator**:
+Save your edits before running `bash scripts/install.sh`; installation stops and restarts Dayline. Open GNOME Looking Glass with **Alt + F2**, type `lg`, and paste this into **Evaluator**:
 
 ```js
 const u = 'dayline@marekbartczak.github.io';
@@ -83,7 +85,7 @@ const updater = await import(GLib.filename_to_uri(GLib.build_filenamev([GLib.get
 await updater.activateUpdate(Main.extensionManager.lookup(u))
 ```
 
-Press Enter, then Esc. The update loads an immutable runtime snapshot with fresh module URLs. Tasks, notes, the selected view and composer drafts are preserved. An active unsaved editor blocks the update rather than discarding its text. No unsafe-mode setting is needed.
+Press Enter, then Esc. The update loads an immutable runtime snapshot with fresh module URLs, and can directly activate a previously disabled Dayline. Runtime switching preserves stored entries and any available composer/closed-window drafts. An open inline or separate editor blocks the switch; save or close it first. No unsafe-mode setting is needed.
 
 ## Your data
 
@@ -101,6 +103,7 @@ Private notes live separately in `~/.local/share/dayline/private-notes.vault`, o
 bash scripts/check.sh       # Domain, storage, encrypted vault, installer and syntax/schema checks
 bash scripts/test-shell.sh  # Actual isolated GNOME Shell 50 UI/lifecycle test
 DAYLINE_TEST_SCRIPT="$PWD/tests/privateShell.js" bash scripts/test-shell.sh # Private tab lifecycle
+DAYLINE_TEST_SCRIPT="$PWD/tests/entryWindows.js" bash scripts/test-shell.sh # Separate windows, opacity and gutters
 ```
 
 The first command needs Node.js 22+, GJS and system Python 3 with `cryptography`. The Shell test also needs `gnome-shell-test-tool` from GNOME 50. It uses temporary XDG data, settings, and runtime directories, and synthetic examples. It does not touch your Dayline list or desktop extension settings.

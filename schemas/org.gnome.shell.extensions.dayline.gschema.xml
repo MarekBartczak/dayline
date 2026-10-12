@@ -14,8 +14,8 @@
     <key name="opacity" type="i">
       <range min="20" max="100"/>
       <default>100</default>
-      <summary>Popup background opacity in percent</summary>
-      <description>Only the panel background changes opacity; text and controls remain fully readable.</description>
+      <summary>Window opacity in percent</summary>
+      <description>The entire popup changes opacity uniformly, including its background, cards, buttons and text.</description>
     </key>
     <key name="compact" type="b">
       <default>true</default>

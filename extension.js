@@ -22,6 +22,7 @@ export default class DaylineExtension extends Extension {
         attachPin(this.panel);
         this.screenLockSignal = Main.screenShield.connect('locked-changed', () => {
             if (Main.screenShield.locked) {
+                this.panel.details?.close();
                 void this.panel.privateNotes.lock();
                 this.panel.menu.close(BoxPointer.PopupAnimation.NONE);
             }
@@ -140,6 +141,7 @@ export default class DaylineExtension extends Extension {
             this.monitor = null;
         }
         if (this.panel) {
+            this.panel.details?.close();
             void this.panel.privateNotes.dispose();
             this.panel.root.remove_all_transitions();
             this.panel.menu.close(BoxPointer.PopupAnimation.NONE);
@@ -147,6 +149,7 @@ export default class DaylineExtension extends Extension {
             actor.remove_all_transitions();
             // Complete pending allocation while the popup's GObject is alive.
             Main.layoutManager.panelBox.get_allocation_box();
+            Main.uiGroup.get_allocation_box();
             actor.get_parent()?.remove_child(actor);
             this.panel.destroy();
         }

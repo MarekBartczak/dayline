@@ -20,7 +20,7 @@
 .dayline-tab:hover { color: #eeedf6; background-color: #30303e; }
 .dayline-tab-active { background-color: #3c3454; color: #d6c9ff; }
 .dayline-tab-active:hover { background-color: #493e65; }
-.dayline-content { spacing: 7px; }
+.dayline-content { spacing: 7px; padding-right: 8px; }
 .dayline-scroll { max-height: 430px; }
 .dayline-section-heading { spacing: 8px; padding: 10px 4px 5px; }
 .dayline-section-title, .dayline-caption { color: #9999af; font-size: 10px; font-weight: 700; letter-spacing: 1px; }
@@ -144,6 +144,9 @@
 .dayline-light .dayline-pin-hint { color: #786e89; }
 .dayline-pin-active { color: #e5dafb; background-color: #40364f; }
 .dayline-editor-field { border-radius: 10px; }
+.dayline-entry-window { border: 1px solid #393a4b; border-radius: 18px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35); }
+.dayline-detail-content { padding: 18px; spacing: 10px; }
+.dayline-detail-scroll { padding-right: 6px; }
 .dayline-compact .dayline-editor { spacing: 9px; }
 .dayline-compact .dayline-textarea { min-height: 105px; }
 

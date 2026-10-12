@@ -1,4 +1,4 @@
-// Portable appearance choices. Opacity affects the frame, never text opacity.
+// Portable appearance choices. Window opacity fades the entire popup actor.
 const accents = {
     ubuntu: {color: '#e95420', dark: '#f8b391', light: '#ad370a', soft: '#3e2e27', pale: '#fff0e6'},
     violet: {color: '#8a5ac2', dark: '#cfb3fa', light: '#7540a4', soft: '#362c47', pale: '#f2e9fc'},
@@ -13,8 +13,13 @@ export function resolveAccent(choice, systemColor = 'orange') {
     return {name: accents[name] ? name : 'ubuntu', ...(accents[name] ?? accents.ubuntu)};
 }
 
-export function backgroundColor(accent, light, opacity) {
+export function windowOpacity(percent = 100) {
+    const opacity = Number.isFinite(percent) ? percent : 100;
+    return Math.round(Math.max(20, Math.min(100, opacity)) * 255 / 100);
+}
+
+export function backgroundColor(accent, light) {
     const color = light ? accent.name === 'ubuntu' ? '#faf9f7' : '#faf9fd' : accent.name === 'ubuntu' ? '#242424' : '#20212d';
     const rgb = [1, 3, 5].map(start => parseInt(color.slice(start, start + 2), 16));
-    return `rgba(${rgb.join(', ')}, ${Math.max(20, Math.min(100, opacity)) / 100})`;
+    return `rgba(${rgb.join(', ')}, 1)`;
 }
