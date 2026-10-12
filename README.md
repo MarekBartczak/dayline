@@ -34,7 +34,7 @@ cd dayline
 bash scripts/install.sh
 ```
 
-The installer copies Dayline into your user's GNOME extension directory and tries to enable it. **On Wayland, a first installation may require logging out and back in**; the installer schedules Dayline to enable on that login. To enable it manually:
+The installer disables Dayline and waits until it stops before changing installed files, then verifies that it becomes active again. Compiled schemas are built separately and replaced atomically, preserving existing memory mappings. **On Wayland, a first installation may require logging out and back in**; the installer schedules Dayline to enable on that login. To enable it manually:
 
 ```bash
 gnome-extensions enable dayline@marekbartczak.github.io
