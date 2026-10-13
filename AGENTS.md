@@ -10,3 +10,9 @@ The user requires **disable → change → verify → enable** for GNOME changes
 - Do not overwrite compiled schemas in place. GLib can retain memory mappings after an extension is disabled. Compile separately and publish files atomically; keep runtime snapshots immutable.
 - Verify ACTIVE after enabling. On installation or activation failure, leave the affected extension disabled and explain the failure.
 - Preserve task and vault data and other extensions' settings. Restore a global crash-recovery switch only after verifying the affected extension is disabled.
+
+# Test data isolation
+
+- Set XDG_DATA_HOME, XDG_CONFIG_HOME and GSETTINGS_BACKEND before launching a test process. GLib caches these paths during GI initialization; changing them later does not isolate storage.
+- Any test using default Store or ImageStore paths must assert the resolved data and attachment directories are inside its temporary root before its first write. Never exercise imports/restores against personal data.
+- Run image clipboard/file-picker/preview regressions (`tests/taskImages.js`) pinned and unpinned. The virtual pointer must start outside the top bar before opening a modal panel programmatically.

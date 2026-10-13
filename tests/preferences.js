@@ -86,7 +86,7 @@ app.connect('activate', () => {
             assert(opacity.value === 65, 'Opacity must follow external settings updates');
             opacity.value = 100;
             assert(settings.get_int('opacity') === 100, 'Maximum opacity must save');
-            assert(row('Dayline 0.2.2'), 'Preferences must show the current release');
+            assert(row(`Dayline ${metadata['version-name']}`), 'Preferences must show the current release');
 
             const compact = row('Compact layout');
             assert(compact instanceof Adw.SwitchRow, 'Compact layout must offer a switch');

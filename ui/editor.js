@@ -122,8 +122,10 @@ export function editor(kind, item, initialText, initialDate, data, onSave, onCan
     field.connect('notify::allocation', scheduleMeasure);
     text.connect('notify::height', revealCaret);
     const formatting = createFormatting({text, field, stack, format: options.format ?? item?.format,
+        images: options.images ?? item?.images, imageStore: kind === 'tasks' ? options.imageStore : null, onPreview: options.onPreview, onReady: options.onReady, onChoose: options.onChoose,
         limit: kind === 'notes' ? MAX_NOTE_TEXT : MAX_TASK_TEXT, onError, onChange: scheduleMeasure});
     root.insert_child_at_index(formatting.toolbar, 2);
+    if (kind === 'tasks' && options.imageStore) header.insert_child_at_index(iconButton('Insert images', 'insert-image-symbolic', formatting.chooseImages), 2);
     text.clutter_text.connect('text-changed', scheduleMeasure);
     text.clutter_text.connect('notify::cursor-position', revealCaret);
     // Appending at the end leaves cursor_position at -1. Cursor geometry is
@@ -167,7 +169,7 @@ export function editor(kind, item, initialText, initialDate, data, onSave, onCan
         root.add_child(label('No date. Keep ideas and details you want to come back to.', 'dayline-muted', true));
     }
     const save = () => {
-        try { onSave(text.get_text(), date?.get_text(), formatting.getFormat()); } catch (error) { onError(error.message); }
+        try { if (formatting.isPending()) throw new Error('Wait for the image to finish loading before saving.'); onSave(text.get_text(), date?.get_text(), formatting.getFormat(), kind === 'tasks' ? formatting.getImages() : undefined); } catch (error) { onError(error.message); }
     };
     const actions = box(false, 'dayline-editor-actions');
     actions.add_child(button('Cancel', onCancel, 'dayline-secondary'));
@@ -187,7 +189,7 @@ export function editor(kind, item, initialText, initialDate, data, onSave, onCan
         }
         return Clutter.EVENT_PROPAGATE;
     });
-    return {root, text, date, kind, item, getFormat: formatting.getFormat,
+    return {root, text, date, kind, item, getFormat: formatting.getFormat, getImages: formatting.getImages, pasteImages: formatting.pasteImages,
         resize(value, limit) {
             expanded = value;
             heightLimit = limit;

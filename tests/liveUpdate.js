@@ -24,7 +24,7 @@ export async function run() {
     old.panel.refresh();
     await activateUpdate(record, GLib.getenv('DAYLINE_UPDATE_RUNTIME'));
     const app = record.stateObj;
-    if (app === old || !app.panel.pinning || app.store.data.version !== 2) throw new Error('Fresh v0.2 runtime must replace old module cache');
+    if (app === old || !app.panel.pinning || app.store.data.version !== 3) throw new Error('Fresh runtime with canonical v3 data must replace old module cache');
     if (app.panel.composer.get_text() !== 'Unsubmitted composer draft') throw new Error('Composer draft lost during update');
     if (app.store.data.tasks[0].text !== oldTask.text || app.store.data.tasks[0].id !== oldTask.id) throw new Error('User data changed during update');
     app.start(oldTask.id);

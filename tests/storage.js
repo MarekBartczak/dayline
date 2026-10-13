@@ -48,13 +48,13 @@ try {
     const legacyContents = JSON.stringify(legacy, null, 4) + '\n';
     file.replace_contents(legacyContents, null, false, Gio.FileCreateFlags.PRIVATE, null);
     const migrated = new Store(path);
-    assert(!migrated.error && migrated.data.version === 2, 'Existing v1 data must load as canonical v2');
+    assert(!migrated.error && migrated.data.version === 3, 'Existing v1 data must load as canonical v3');
     assert(migrated.data.tasks.every(task => task.inProgress === false), 'Migration must preserve done tasks and default to waiting');
     assert(migrated.data.tasks[1].done && migrated.data.notes[0].text === legacy.notes[0].text, 'Migration must preserve task status and notes');
     migrated.save(updateTask(migrated.data, 'legacy', {inProgress: true}));
     const [, migratedBytes] = file.load_contents(null);
     const onDisk = JSON.parse(new TextDecoder().decode(migratedBytes));
-    assert(onDisk.version === 2 && onDisk.tasks[0].inProgress, 'Saving migrated data must persist v2 task status');
+    assert(onDisk.version === 3 && onDisk.tasks[0].inProgress, 'Saving migrated data must persist v3 task status');
     assert(new Store(path).data.tasks[0].inProgress, 'In-progress status must survive reload');
     const [, legacyBackupBytes] = Gio.File.new_for_path(`${path}.bak`).load_contents(null);
     assert(new TextDecoder().decode(legacyBackupBytes) === legacyContents, 'Migration save must retain original v1 bytes in backup');

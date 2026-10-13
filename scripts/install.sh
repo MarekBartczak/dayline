@@ -37,11 +37,11 @@ cleanup() {
 trap cleanup EXIT
 # Fresh URLs avoid GNOME's ES module cache during a live update. Reuse only
 # identical snapshots; existing loaded snapshots are never changed in place.
-snapshot_id="$(sha256sum "$project_dir"/*.js "$project_dir/private_vault.py" "$project_dir"/ui/*.js "$project_dir"/icons/*.svg "$project_dir"/schemas/*.xml "$project_dir/metadata.json" "$project_dir/stylesheet.css" | sha256sum | cut -c1-12)"
-snapshot="$target/runtimes/0.3.1-$snapshot_id"
+snapshot_id="$(sha256sum "$project_dir"/*.js "$project_dir/private_vault.py" "$project_dir/image_worker.py" "$project_dir"/ui/*.js "$project_dir"/icons/*.svg "$project_dir"/schemas/*.xml "$project_dir/metadata.json" "$project_dir/stylesheet.css" | sha256sum | cut -c1-12)"
+snapshot="$target/runtimes/0.4.0-$snapshot_id"
 if [[ ! -d "$snapshot" ]]; then
     staging="$(mktemp -d "$target/runtimes/.staging-XXXXXX")"
-    cp "$project_dir"/{extension.js,metadata.json,model.js,formatting.js,store.js,vault.js,private_vault.py,prefs.js,liveUpdate.js,stylesheet.css,LICENSE} "$staging/"
+    cp "$project_dir"/{extension.js,metadata.json,model.js,images.js,imageStore.js,image_worker.py,formatting.js,store.js,vault.js,private_vault.py,prefs.js,liveUpdate.js,stylesheet.css,LICENSE} "$staging/"
     cp -R "$project_dir"/{ui,icons} "$staging/"
     mkdir "$staging/schemas"
     cp "$project_dir"/schemas/*.xml "$staging/schemas/"

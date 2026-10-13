@@ -4,7 +4,7 @@ import * as m from '../model.js';
 
 const timestamp = '2026-10-12T08:00:00.000Z';
 const task = (id, date, done = false, inProgress = false) => ({id, text: `Task ${id}`, date, done, inProgress, createdAt: timestamp});
-const empty = () => ({version: 2, tasks: [], notes: []});
+const empty = () => ({version: 3, tasks: [], notes: []});
 
 test('local dates use local timezone, with leap-day and strict date validation', () => {
     assert.equal(m.localDate(new Date(2026, 9, 12, 23, 59)), '2026-10-12');
@@ -78,7 +78,7 @@ test('notes preserve literal markup and multiline text without a task date', () 
 test('import validates whole document and rejects destructive invalid data', () => {
     const valid = {...empty(), tasks: [task('a', '2026-10-12')]};
     assert.deepEqual(m.validateDocument(valid), valid);
-    const invalid = [null, [], {}, {...valid, version: 3}, {...valid, tasks: [task('a', '2026-02-30')]},
+    const invalid = [null, [], {}, {...valid, version: 4}, {...valid, tasks: [task('a', '2026-02-30')]},
         {...valid, tasks: [{...task('a', '2026-10-12'), done: 'yes'}]},
         {...valid, tasks: [task('a', '2026-10-12'), task('a', '2026-10-13')]},
         {...valid, notes: [{id: 'a', text: 'collision', createdAt: timestamp}]},
@@ -97,13 +97,13 @@ test('validated output is detached and never silently drops fields', () => {
     assert.throws(() => m.validateDocument({...original, unexpected: 'value'}));
 });
 
-test('v1 imports migrate every task to v2 without changing original records or notes', () => {
+test('v1 imports migrate every task to v3 without changing original records or notes', () => {
     const legacyTask = (id, done) => ({id, text: `  Task ${id}  `, date: '2026-10-12', done, createdAt: timestamp});
     const original = {version: 1, tasks: [legacyTask('waiting', false), legacyTask('done', true)],
         notes: [{id: 'n', text: '  First line\n<b>literal markup</b>\n', createdAt: timestamp}]};
     const snapshot = structuredClone(original);
     const migrated = m.validateDocument(original);
-    assert.deepEqual(migrated, {version: 2, tasks: original.tasks.map(item => ({...item, inProgress: false})), notes: original.notes});
+    assert.deepEqual(migrated, {version: 3, tasks: original.tasks.map(item => ({...item, inProgress: false})), notes: original.notes});
     assert.deepEqual(original, snapshot);
     assert.deepEqual(m.validateDocument(JSON.parse(JSON.stringify(migrated))), migrated);
     assert.notEqual(migrated.tasks[0], original.tasks[0]);
@@ -113,7 +113,7 @@ test('v1 imports migrate every task to v2 without changing original records or n
     assert.deepEqual(m.emptyDocument(), empty());
 });
 
-test('both document versions enforce exact status fields and reject contradictory status', () => {
+test('all document versions enforce exact status fields and reject contradictory status', () => {
     const valid = {...empty(), tasks: [task('a', '2026-10-12', false, true)]};
     assert.deepEqual(m.validateDocument(valid), valid);
     const missingStatus = {...valid.tasks[0]};
@@ -124,6 +124,8 @@ test('both document versions enforce exact status fields and reject contradictor
         {...valid, tasks: [{...valid.tasks[0], inProgress: 'yes'}]},
         {...valid, tasks: [{...valid.tasks[0], done: true}]},
         {...valid, tasks: [{...valid.tasks[0], status: 'active'}]},
+        {...valid, version: 2, tasks: [missingStatus]},
+        {...valid, version: 2, tasks: [{...valid.tasks[0], done: true}]},
     ])
         assert.throws(() => m.validateDocument(document));
 });
@@ -199,7 +201,7 @@ test('implicit edits of formatted entries preserve indentation and trailing newl
     assert.equal(m.updateNote(plain, 'plain', {text: '\t changed \n'}).notes[0].text, 'changed');
 });
 
-test('document validation rejects invalid optional formats and keeps legacy versions', () => {
+test('document validation rejects invalid optional formats and keeps legacy formatting', () => {
     const original = {...empty(), tasks: [{...task('a', '2026-10-12'), text: 'A😀b', format: [{type: 'bold', start: 1, end: 2}]}]};
     assert.deepEqual(m.validateDocument(original), original);
     const copy = m.validateDocument(original);
@@ -218,4 +220,69 @@ test('formatted 50k task documents round trip and reject oversized text', () => 
     const added = m.addTask(empty(), {id: 'long-format', text, format, date: '2026-10-12', createdAt: timestamp});
     assert.equal(m.validateDocument(JSON.parse(JSON.stringify(added))).tasks[0].text, text);
     assert.throws(() => m.updateTask(added, 'long-format', {text: `${text}x`, format: []}));
+});
+
+const imageMarker = '\uFFFC';
+const image = offset => ({id: 'a'.repeat(64), name: 'photo.png', mime: 'image/png', width: 640, height: 480, size: 1200, offset});
+
+test('v2 documents migrate to v3 without changing text, statuses, formatting or input bytes', () => {
+    const original = {version: 2, tasks: [{...task('a', '2026-10-12', false, true), text: '  task\n', format: []}],
+        notes: [{id: 'n', text: '  note\n', createdAt: timestamp}]};
+    const bytes = JSON.stringify(original);
+    assert.deepEqual(m.validateDocument(original), {...original, version: 3});
+    assert.equal(JSON.stringify(original), bytes);
+});
+
+test('image tasks preserve exact whitespace and allow image-only tasks', () => {
+    const text = ` \n${imageMarker}\n `;
+    const images = [image(2)];
+    const added = m.addTask(empty(), {id: 'picture', text, images, date: '2026-10-12', createdAt: timestamp});
+    assert.equal(added.tasks[0].text, text);
+    assert.deepEqual(added.tasks[0].images, images);
+    added.tasks[0].images[0].name = 'changed';
+    assert.equal(images[0].name, 'photo.png');
+    const only = m.addTask(empty(), {id: 'only', text: imageMarker, images: [image(0)], date: '2026-10-12', createdAt: timestamp});
+    assert.equal(m.todaySummary(only, '2026-10-12').remaining, 1);
+    assert.equal(m.validateDocument(JSON.parse(JSON.stringify(only))).tasks[0].text, imageMarker);
+    assert.equal(m.addTask(empty(), {id: 'empty-images', text: '  text\n', images: [], date: '2026-10-12', createdAt: timestamp}).tasks[0].text, '  text\n');
+});
+
+test('task text edits remap images while explicit images replace references', () => {
+    const added = m.addTask(empty(), {id: 'picture', text: `😀${imageMarker}\n`, images: [image(1)], format: [], date: '2026-10-12', createdAt: timestamp});
+    const moved = m.updateTask(added, 'picture', {text: ` X😀${imageMarker}\n`});
+    assert.equal(moved.tasks[0].text, ` X😀${imageMarker}\n`);
+    assert.deepEqual(moved.tasks[0].images, [image(3)]);
+    assert.deepEqual(added.tasks[0].images, [image(1)]);
+    assert.deepEqual(m.updateTask(moved, 'picture', {text: 'plain'}).tasks[0].images, []);
+    const changed = m.updateTask(moved, 'picture', {text: imageMarker, images: [image(0)]});
+    assert.deepEqual(changed.tasks[0].images, [image(0)]);
+    assert.deepEqual(m.updateTask(changed, 'picture', {done: true}).tasks[0].images, [image(0)]);
+    const removed = m.removeItem(changed, 'tasks', 'picture');
+    assert.deepEqual(m.restoreItem(removed, 'tasks', changed.tasks[0]).tasks[0], changed.tasks[0]);
+});
+
+test('image references are task-only, require v3 and cover every image marker', () => {
+    const picture = {...task('a', '2026-10-12'), text: imageMarker, images: [image(0)]};
+    for (const version of [1, 2]) {
+        const legacy = {...picture};
+        if (version === 1)
+            delete legacy.inProgress;
+        assert.throws(() => m.validateDocument({version, tasks: [legacy], notes: []}));
+    }
+    assert.throws(() => m.validateDocument({...empty(), tasks: [{...picture, images: []}]}));
+    assert.throws(() => m.validateDocument({...empty(), tasks: [{...picture, images: undefined}]}));
+    assert.throws(() => m.validateDocument({...empty(), notes: [{id: 'n', text: imageMarker, createdAt: timestamp, images: [image(0)]}]}));
+    assert.throws(() => m.addNote(empty(), {id: 'n', text: imageMarker, createdAt: timestamp, images: [image(0)]}));
+    const note = m.addNote(empty(), {id: 'n', text: 'note', createdAt: timestamp});
+    assert.throws(() => m.updateNote(note, 'n', {images: []}));
+    const legacyMarker = {...task('legacy', '2026-10-12'), text: `literal ${imageMarker}`};
+    assert.equal(m.validateDocument({version: 2, tasks: [legacyMarker], notes: []}).tasks[0].text, legacyMarker.text);
+});
+
+test('image tasks keep the existing UTF-16 50k text limit', () => {
+    const text = `${'😀'.repeat(24999)}x${imageMarker}`;
+    assert.equal(text.length, m.MAX_TASK_TEXT);
+    const added = m.addTask(empty(), {id: 'large', text, images: [image(25000)], date: '2026-10-12', createdAt: timestamp});
+    assert.equal(added.tasks[0].text, text);
+    assert.throws(() => m.updateTask(added, 'large', {text: `${text}x`}));
 });

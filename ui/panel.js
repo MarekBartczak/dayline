@@ -12,6 +12,8 @@ import {editor} from './editor.js';
 import {resolveAccent, backgroundColor, windowOpacity} from './appearance.js';
 import {PrivateNotes} from './privateNotes.js';
 import {formattedLabel} from './formatting.js';
+import {imageButton, imageClipboardType} from './images.js';
+import {remapImages} from '../images.js';
 import {remapFormat} from '../formatting.js';
 
 export const DaylinePanel = GObject.registerClass({
@@ -29,6 +31,9 @@ export const DaylinePanel = GObject.registerClass({
         // Register before the panel menu manager, which otherwise consumes
         // Escape and closes the popup before an entry can return to the list.
         this.menu.actor.connect('captured-event', (_actor, event) => {
+            if (this.imagePreview && event.type() === Clutter.EventType.KEY_PRESS && event.get_key_symbol() === Clutter.KEY_Escape) {
+                this.closeImage(); return Clutter.EVENT_STOP;
+            }
             if (this.editor && this.editor.kind !== 'private' && event.type() === Clutter.EventType.KEY_PRESS && event.get_key_symbol() === Clutter.KEY_Escape) {
                 this.returnToList();
                 return Clutter.EVENT_STOP;
@@ -85,6 +90,14 @@ export const DaylinePanel = GObject.registerClass({
         this.composer = new St.Entry({hint_text: 'What is on your list?', style_class: 'dayline-entry', can_focus: true, x_expand: true, accessible_name: 'New entry'});
         this.composer.clutter_text.connect('activate', () => this.submit());
         compose.add_child(this.composer);
+        this.composer.clutter_text.connect('key-press-event', (_actor, event) => {
+            if (this.tab === 'notes' || this.tab === 'private' || !(event.get_state() & Clutter.ModifierType.CONTROL_MASK) || ![Clutter.KEY_v, Clutter.KEY_V].includes(event.get_key_symbol())) return Clutter.EVENT_PROPAGATE;
+            const type = imageClipboardType();
+            if (!type) return Clutter.EVENT_PROPAGATE;
+            this.showEditor('tasks', null);
+            void this.editor.pasteImages(type);
+            return Clutter.EVENT_STOP;
+        });
         compose.add_child(iconButton('Open full editor', 'document-edit-symbolic', () => this.showEditor(this.tab === 'notes' ? 'notes' : 'tasks', null)));
         compose.add_child(iconButton('Add entry', 'list-add-symbolic', () => this.submit(), 'dayline-add'));
         this.composerArea.add_child(compose);
@@ -113,7 +126,7 @@ export const DaylinePanel = GObject.registerClass({
         if (compact) this.root.add_style_class_name('dayline-compact');
         else this.root.remove_style_class_name('dayline-compact');
         const availableHeight = monitor.height / scale;
-        const height = Math.max(120, Math.min(this.editor ? availableHeight - 160 : compact ? 300 : 430, availableHeight - (this.editor ? 140 : 310)));
+        const height = Math.max(120, Math.min((this.editor || this.imagePreview) ? availableHeight - 160 : compact ? 300 : 430, availableHeight - ((this.editor || this.imagePreview) ? 140 : 310)));
         this.scroll.set_style(`max-height: ${height}px;`);
         const width = Math.min(this.expanded ? 652 : compact ? 382 : 464, Math.max(260, monitor.width / scale - 40)) * scale;
         if (animate && this.root.mapped)
@@ -123,7 +136,7 @@ export const DaylinePanel = GObject.registerClass({
     }
 
     setExpanded(expanded, animate = true) {
-        this.expanded = Boolean(expanded && this.editor);
+        this.expanded = Boolean(expanded && (this.editor || this.imagePreview));
         this.adjustSize(animate);
     }
 
@@ -159,7 +172,8 @@ export const DaylinePanel = GObject.registerClass({
             const draft = this.entryDrafts.get(key);
             const text = this.composer.get_text();
             this.app.add(kind, text, draft?.date ?? (this.tab === 'today' ? this.app.today : this.selectedDate),
-                draft ? remapFormat(draft.text, text, draft.format) : undefined);
+                draft ? remapFormat(draft.text, text, draft.format) : undefined,
+                kind === 'tasks' && draft?.images ? remapImages(draft.text, text, draft.images) : undefined);
             this.entryDrafts.delete(key);
             this.composer.set_text('');
             this.drafts.delete(this.draftKey());
@@ -185,13 +199,13 @@ export const DaylinePanel = GObject.registerClass({
         if (current.item) {
             const key = `${current.kind}/${current.item.id}`;
             if (discardDraft) this.entryDrafts.delete(key);
-            else this.entryDrafts.set(key, {text: current.text.get_text(), date: current.date?.get_text(), format: current.getFormat()});
+            else this.entryDrafts.set(key, {text: current.text.get_text(), date: current.date?.get_text(), format: current.getFormat(), ...(current.kind === 'tasks' ? {images: current.getImages()} : {})});
         } else {
             const key = current.newDraftKey ?? this.newEntryKey(current.kind);
             if (discardDraft) this.entryDrafts.delete(key);
             else {
                 const text = current.text.get_text();
-                this.entryDrafts.set(key, {text, date: current.date?.get_text(), format: current.getFormat()});
+                this.entryDrafts.set(key, {text, date: current.date?.get_text(), format: current.getFormat(), ...(current.kind === 'tasks' ? {images: current.getImages()} : {})});
                 this.composer.set_text(text);
             }
         }
@@ -213,16 +227,19 @@ export const DaylinePanel = GObject.registerClass({
         const draft = item && this.entryDrafts.get(`${kind}/${item.id}`);
         const newKey = this.newEntryKey(kind);
         const newDraft = !item && this.entryDrafts.get(newKey);
-        const editedItem = item ? {...item, text: draft?.text ?? item.text, date: draft?.date ?? item.date, format: draft?.format ?? item.format} : null;
+        const editedItem = item ? {...item, text: draft?.text ?? item.text, date: draft?.date ?? item.date, format: draft?.format ?? item.format, images: draft?.images ?? item.images} : null;
         const cancel = () => this.returnToList(true);
         this.editor = editor(kind, editedItem, this.composer.get_text(), newDraft?.date ?? (this.tab === 'today' ? this.app.today : this.selectedDate), this.app.store.data,
-            (text, date, format) => {
-                if (item) this.app.edit(kind, item.id, text, date, format);
-                else this.app.add(kind, text, date, format);
+            (text, date, format, images) => {
+                if (item) this.app.edit(kind, item.id, text, date, format, images);
+                else this.app.add(kind, text, date, format, images);
                 if (!item) { this.composer.set_text(''); this.drafts.delete(this.draftKey()); }
                 this.returnToList(true);
             }, cancel, message => this.showMessage(message), () => this.setExpanded(!this.expanded),
-            {onBack: () => this.returnToList(), onClose: () => this.returnToList(), title: item ? kind === 'tasks' ? 'Task details' : 'Note details' : undefined,
+            {imageStore: this.app.images, onPreview: image => this.showImage(image), onReady: () => this.menu.open(),
+                onChoose: () => { if (!this.pinning.pinned) this.menu.close(); },
+                images: kind === 'tasks' && newDraft?.images ? remapImages(newDraft.text, this.composer.get_text(), newDraft.images) : undefined,
+                onBack: () => this.returnToList(), onClose: () => this.returnToList(), title: item ? kind === 'tasks' ? 'Task details' : 'Note details' : undefined,
                 format: newDraft ? remapFormat(newDraft.text, this.composer.get_text(), newDraft.format) : undefined});
         if (!item) this.editor.newDraftKey = newKey;
         this.body.add_child(this.editor.root);
@@ -230,6 +247,39 @@ export const DaylinePanel = GObject.registerClass({
         this.tabsBox.hide();
         this.adjustSize(true);
         this.editor.text.grab_key_focus();
+    }
+
+    showImage(image) {
+        if (this.imagePreview) this.closeImage();
+        const root = box(true, 'dayline-image-preview');
+        const header = box(false, 'dayline-editor-heading');
+        header.add_child(iconButton('Back to task', 'go-previous-symbolic', () => this.closeImage()));
+        const title = label(image.name, 'dayline-editor-title', true);title.x_expand = true;header.add_child(title);
+        header.add_child(iconButton('Open original image', 'document-open-symbolic', () => {
+            Gio.AppInfo.launch_default_for_uri_async(Gio.File.new_for_path(this.app.images.path(image, 'original')).get_uri(), global.create_app_launch_context(0, -1), null, (source, result) => {
+                try { Gio.AppInfo.launch_default_for_uri_finish(result); }
+                catch (error) { if (this.get_stage()) this.showMessage(error.message); }
+            });
+        }));
+        root.add_child(header);
+        const monitor = Main.layoutManager.findMonitorForActor(this) ?? Main.layoutManager.primaryMonitor;
+        const scale = St.ThemeContext.get_for_stage(global.stage).scale_factor;
+        root.add_child(imageButton(image, this.app.images, () => {}, Math.min(480, (monitor?.height ?? 720) / scale - 240), 'preview.png', true));
+        this.imagePreview = {root, expanded: this.expanded, scroll: this.scroll.vadjustment.value};
+        for (const child of this.body.get_children()) child.hide();
+        this.body.add_child(root);this.composerArea.hide();this.summary.hide();this.tabsBox.hide();
+        this.message.hide();this.expanded = true;this.scroll.vadjustment.value = 0;this.adjustSize(true);
+    }
+
+    closeImage() {
+        if (!this.imagePreview) return;
+        const preview = this.imagePreview;this.imagePreview = null;
+        this.expanded = preview.expanded;
+        const focus = this.editor?.text ?? this.composer;
+        focus.grab_key_focus();preview.root.destroy();
+        for (const child of this.body.get_children()) child.show();
+        if (!this.editor) {this.summary.show();this.tabsBox.show();this.composerArea.show();}
+        this.adjustSize(true);this.scroll.vadjustment.value = preview.scroll;
     }
 
     openDetails(kind, item) {
@@ -246,7 +296,8 @@ export const DaylinePanel = GObject.registerClass({
     }
 
     taskRow(item, overdue = false) {
-        const row = box(false, item.done ? 'dayline-task dayline-task-done' : 'dayline-task');
+        const card = item.images?.length ? box(true, item.done ? 'dayline-task dayline-task-done' : 'dayline-task') : null;
+        const row = box(false, card ? 'dayline-task-controls' : item.done ? 'dayline-task dayline-task-done' : 'dayline-task');
         const check = button(`${item.done ? 'Reopen' : 'Complete'}: ${item.text}`, () => this.app.toggle(item.id), `dayline-check ${item.done ? 'dayline-check-done' : ''}`,
             item.done ? 'object-select-symbolic' : null);
         if (!item.done) check.set_child(new St.Widget({width: 12, height: 12}));
@@ -255,7 +306,10 @@ export const DaylinePanel = GObject.registerClass({
         const textButton = button(`Edit: ${item.text}`, () => this.showEditor('tasks', item), 'dayline-task-text-button');
         textButton.x_expand = true;
         const content = box(true, 'dayline-task-text');
-        const lines = item.text.split('\n');
+        const characters = Array.from(item.text);
+        const firstImage = item.images?.[0]?.offset;
+        const lead = firstImage === undefined ? item.text : characters.slice(0, firstImage).join('');
+        const lines = lead.split('\n');
         let preview = lines.slice(0, 4).join('\n');
         if (preview.length > 220 || lines.length > 4) preview = `${preview.slice(0, 220)}…`;
         content.add_child(formattedLabel(preview, item.format, item.done ? 'dayline-done-text' : '', true));
@@ -274,6 +328,23 @@ export const DaylinePanel = GObject.registerClass({
         const remove = iconButton('Delete task', 'user-trash-symbolic', () => this.app.remove('tasks', item.id));
         remove.y_align = Clutter.ActorAlign.START;
         row.add_child(remove);
+        if (card) {
+            card.add_child(row);
+            for (let index = 0; index < item.images.length; index++) {
+                const image = item.images[index];
+                card.add_child(imageButton(image, this.app.images, () => this.showImage(image)));
+                const start = image.offset + 1;
+                const end = item.images[index + 1]?.offset ?? characters.length;
+                const value = characters.slice(start, end).join('');
+                if (!value.trim()) continue;
+                const preview = Array.from(value).slice(0, 220).join('') + (Array.from(value).length > 220 ? '…' : '');
+                const ranges = (item.format ?? []).filter(range => range.start < end && range.end > start)
+                    .map(range => ({...range, start: Math.max(start, range.start) - start, end: Math.min(end, range.end) - start}));
+                const edit = button(`Edit paragraph: ${item.id}/${index}`, () => this.showEditor('tasks', item), 'dayline-task-text-button');
+                edit.x_expand = true;edit.set_child(formattedLabel(preview, ranges, item.done ? 'dayline-done-text' : '', true));card.add_child(edit);
+            }
+            return card;
+        }
         return row;
     }
 
@@ -382,7 +453,7 @@ export const DaylinePanel = GObject.registerClass({
             if (this.app.deleted) this.showMessage('Entry deleted.', true);
             else this.message.hide();
         }
-        if (this.editor) {
+        if (this.editor || this.imagePreview) {
             this.summary.hide();
             this.tabsBox.hide();
             return;

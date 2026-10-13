@@ -139,7 +139,7 @@ export function listSelection(text, format, start, end, ordered = false) {
         while (lineEnd < last && chars[lineEnd] !== '\n')
             lineEnd++;
         // A list operation never inserts into or removes bytes from code.
-        if (!ranges.some(range => range.type === 'code' && range.start <= lineEnd && range.end > offset))
+        if (!chars.slice(offset, lineEnd).includes('\uFFFC') && !ranges.some(range => range.type === 'code' && range.start <= lineEnd && range.end > offset))
             lines.push({start: offset, text: chars.slice(offset, lineEnd).join('')});
         offset = lineEnd + 1;
     }
@@ -165,6 +165,8 @@ export function codeSelection(text, format, start, end) {
     const chars = characters(text);
     let ranges = validateFormat(text, format);
     selection(chars.length, start, end);
+    if (chars.slice(start, end).includes('\uFFFC'))
+        throw new Error('Select text outside the image block to format as code.');
     if (start === end)
         return {text, format: ranges, start, end};
     if (ranges.some(range => range.type === 'code' && range.start === start && range.end === end))

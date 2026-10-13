@@ -117,3 +117,9 @@ test('code uses existing blank lines and keeps Unicode selection boundaries', ()
     assert.deepEqual(result.format, [span('code', 3, 7)]);
     assert.deepEqual(f.codeSelection(text, [], 3, 3), {text, format: [], start: 3, end: 3});
 });
+
+test('list selection keeps inline image paragraphs intact', () => {
+    const value = 'before\n\uFFFC\nafter';
+    assert.equal(f.listSelection(value, [], 0, Array.from(value).length).text, '• before\n\uFFFC\n• after');
+    assert.throws(() => f.codeSelection(value, [], 0, Array.from(value).length), /outside the image/);
+});

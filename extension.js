@@ -4,6 +4,7 @@ import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as BoxPointer from 'resource:///org/gnome/shell/ui/boxpointer.js';
 import {Store} from './store.js';
+import {ImageStore} from './imageStore.js';
 import {PrivateVault} from './vault.js';
 import {localDate, addTask, addNote, updateTask, updateNote, removeItem, restoreItem} from './model.js';
 import {DaylinePanel} from './ui/panel.js';
@@ -12,6 +13,7 @@ import {attachPin} from './ui/pinning.js';
 export default class DaylineExtension extends Extension {
     enable() {
         this.store = new Store();
+        this.images = new ImageStore(undefined, `${this.path}/image_worker.py`);
         this.vault = new PrivateVault(undefined, `${this.path}/private_vault.py`);
         this.settings = this.getSettings();
         this.desktopSettings = new Gio.Settings({schema_id: 'org.gnome.desktop.interface'});
@@ -70,14 +72,16 @@ export default class DaylineExtension extends Extension {
         if (!this.deleted) this.panel.message.hide();
     }
 
-    add(kind, text, date, format = undefined) {
+    add(kind, text, date, format = undefined, images = undefined) {
         const item = {id: GLib.uuid_string_random(), text, createdAt: new Date().toISOString()};
         if (format !== undefined) item.format = format;
+        if (kind === 'tasks' && images !== undefined) item.images = images;
         this.commit(data => kind === 'notes' ? addNote(data, item) : addTask(data, {...item, date}));
     }
 
-    edit(kind, id, text, date, format = undefined) {
+    edit(kind, id, text, date, format = undefined, images = undefined) {
         const patch = format === undefined ? {text} : {text, format};
+        if (kind === 'tasks' && images !== undefined) patch.images = images;
         this.commit(data => kind === 'notes' ? updateNote(data, id, patch) : updateTask(data, id, {...patch, date}));
     }
 
@@ -125,6 +129,8 @@ export default class DaylineExtension extends Extension {
     }
 
     disable() {
+        this.images?.dispose();
+        this.images = null;
         if (this.screenLockSignal) Main.screenShield.disconnect(this.screenLockSignal);
         this.screenLockSignal = 0;
         if (this.timer) GLib.Source.remove(this.timer);

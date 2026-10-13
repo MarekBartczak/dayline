@@ -1,11 +1,11 @@
 # Images attached to tasks
 
-Status: proposed for review.
+Status: approved — inline images at the cursor, confirmed by the user on 13 October 2026.
 
 ## User experience
 
 - Attach images to tasks through an image icon in either editor size, or Ctrl+V. Paste accepts clipboard image data and copied local image files. Ordinary text paste keeps its current behavior.
-- Display each image as a separate, full-width block below the task text. Show the blocks in the task list and both editor sizes; do not use a strip of small thumbnails.
+- Insert each image at the cursor as its own paragraph between text paragraphs, displayed as a full-width block. Show the blocks in the task list and both editor sizes; do not use a strip of small thumbnails.
 - Preserve aspect ratio. A preview fills the available width with a bounded height; tall images are cropped for this preview. Clicking shows the complete image in a larger view, with a way back to the same task and its unsaved text.
 - The enlarged preview uses the existing Dayline panel. Keep pin, opacity, and the task draft intact. Constrain its size to the current monitor. Allow opening the original in the system image viewer for full-resolution viewing.
 - Allow multiple images, removing an individual attachment, and image-only tasks. Keep task dates, status and the top-bar counters unchanged.
@@ -23,9 +23,7 @@ Status: proposed for review.
 
 ## Approach
 
-Recommended: attachments beneath the text. This keeps the tested native text editor and its formatting behavior, while giving images the full card width.
-
-Alternative: embed images between paragraphs at the insertion point. This requires a richer document model and changes to cursor navigation, selection, formatting and serialization; it is a separate editor redesign.
+Keep the native text document and formatting ranges. Object replacement characters reserve image paragraphs through Pango shape attributes; positioned image controls share the document scrolling coordinates. Persist validated image metadata and Unicode insertion offsets. Read-only task cards render the same interleaved text and images. External workers validate and normalize images before the compositor displays them.
 
 ## Verification and delivery
 

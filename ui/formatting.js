@@ -4,6 +4,8 @@ import GLib from 'gi://GLib';
 import Pango from 'gi://Pango';
 import GObject from 'gi://GObject';
 import {validateFormat, remapFormat, toggleFormat, listSelection, codeSelection, byteOffsets} from '../formatting.js';
+import {validateImages, remapImages, insertImages} from '../images.js';
+import {imageButton, imageHeight, imageClipboardType, clipboardImages} from './images.js';
 import {box, label, button, iconButton} from './widgets.js';
 
 // Positioned decoration must never contribute its old width to the document's
@@ -15,7 +17,7 @@ const DocumentOverlay = GObject.registerClass({
     vfunc_get_preferred_height() { return [0, 0]; }
 });
 
-function applyAttributes(actor, text, format) {
+function applyAttributes(actor, text, format, decorate = null) {
     if (!actor.get_stage()) return;
     const attributes = textAttributes(text, format);
     const color = actor.get_theme_node().get_foreground_color();
@@ -23,6 +25,7 @@ function applyAttributes(actor, text, format) {
     foreground.start_index = 0;
     foreground.end_index = 0xffffffff;
     attributes.insert(foreground);
+    decorate?.(attributes);
     actor.clutter_text.set_attributes(attributes);
 }
 
@@ -52,7 +55,10 @@ export function formattedLabel(text, format, style = '', wrap = false) {
 
 // One editable plain-text document. Range attributes style its glyphs; code
 // frames and copy controls share the document's scrolling coordinate system.
-export function createFormatting({text, field, stack, format, limit, onError, onChange}) {
+export function createFormatting({text, field, stack, format, limit, onError, onChange, images: initialImages = [], imageStore = null, onPreview, onReady, onChoose}) {
+    let images = imageStore ? validateImages(text.get_text(), initialImages) : [];
+    let pending = false;
+    const imageFrames = [];
     let ranges = validateFormat(text.get_text(), format);
     let previous = text.get_text();
     let expanded = false;
@@ -85,8 +91,69 @@ export function createFormatting({text, field, stack, format, limit, onError, on
     text.clutter_text.connect('notify::cursor-position', rememberSelection);
     text.clutter_text.connect('notify::selection-bound', rememberSelection);
 
+    function imageWidth() {
+        const scale = St.ThemeContext.get_for_stage(global.stage).scale_factor;
+        return Math.max(80 * scale, field.get_allocation_box().get_width() - 54 * scale);
+    }
+
+    function decorateImages(attributes) {
+        if (!imageStore || !images.length) return;
+        const offsets = byteOffsets(content());
+        const scale = St.ThemeContext.get_for_stage(global.stage).scale_factor;
+        const width = imageWidth();
+        for (const image of images) {
+            const height = imageHeight(image, width, 220 * scale);
+            const rectangle = new Pango.Rectangle();
+            rectangle.x = 0; rectangle.y = Math.round(-height + 16 * scale) * Pango.SCALE;
+            rectangle.width = Math.round(width) * Pango.SCALE; rectangle.height = Math.round(height) * Pango.SCALE;
+            const shape = Pango.attr_shape_new(rectangle, rectangle);
+            shape.start_index = offsets[image.offset];
+            shape.end_index = offsets[image.offset + 1];
+            attributes.insert(shape);
+        }
+    }
+
+    function renderImages() {
+        if (!imageStore) return;
+        const signature = images.map(image => `${image.id}/${image.offset}`).join(',');
+        if (imageFrames.signature !== signature) {
+            for (const frame of imageFrames) { frame.view.destroy(); frame.remove.destroy(); }
+            imageFrames.length = 0; imageFrames.signature = signature;
+            for (const image of images) {
+                const view = imageButton(image, imageStore, () => onPreview?.(image));
+                const remove = iconButton(`Remove image: ${image.name}`, 'window-close-symbolic', () => {
+                    flushText();
+                    const current = images.find(i => i.id === image.id && i.offset === image.offset);
+                    if (!current) return;
+                    const before = content(); const chars = Array.from(before); chars.splice(current.offset, 1);
+                    const next = chars.join('');
+                    images = remapImages(before, next, images, {start: current.offset, end: current.offset + 1});
+                    ranges = remapFormat(before, next, ranges, {start: current.offset, end: current.offset + 1});
+                    changing = true; text.set_text(next); previous = next; changing = false;
+                    refresh(); onChange(); text.grab_key_focus();text.clutter_text.set_selection(current.offset, current.offset);
+                }, 'dayline-image-remove');
+                controls.add_child(view); controls.add_child(remove);
+                imageFrames.push({view, remove, image});
+            }
+        }
+        const scale = St.ThemeContext.get_for_stage(global.stage).scale_factor;
+        for (const frame of imageFrames) {
+            const [valid, x, y] = text.clutter_text.position_to_coords(frame.image.offset);
+            if (!valid) { frame.view.hide(); frame.remove.hide(); continue; }
+            const left = text.x + text.clutter_text.x + x;
+            const top = text.y + text.clutter_text.y + y;
+            const width = imageWidth();
+            frame.view.set_position(left, top);
+            frame.view.set_size(width, imageHeight(frame.image, width, 220 * scale));
+            frame.remove.set_position(left + width - 32 * scale, top + 6 * scale);
+            frame.remove.set_size(26 * scale, 26 * scale);
+            frame.view.show();frame.remove.show();
+        }
+    }
+
     function renderFrames() {
         if (destroyed || !text.mapped) return;
+        renderImages();
         const scale = St.ThemeContext.get_for_stage(global.stage).scale_factor;
         const codes = ranges.filter(range => range.type === 'code');
         while (frames.length > codes.length) {
@@ -144,7 +211,7 @@ export function createFormatting({text, field, stack, format, limit, onError, on
     }
 
     function refresh() {
-        applyAttributes(text, content(), ranges);
+        applyAttributes(text, content(), ranges, decorateImages);
         scheduleFrames();
     }
 
@@ -162,6 +229,12 @@ export function createFormatting({text, field, stack, format, limit, onError, on
         if (hint.start === hint.end && delta < 0) {
             if (editKey === Clutter.KEY_BackSpace) hint = {start: hint.start + delta, end: hint.end};
             else if (editKey === Clutter.KEY_Delete) hint = {start: hint.start, end: hint.end - delta};
+        }
+        try {
+            if (imageStore) images = remapImages(previous, next, images, hint);
+        } catch (error) {
+            changing = true; text.set_text(previous); changing = false;
+            onError(error.message); return;
         }
         ranges = remapFormat(previous, next, ranges, hint);
         previous = next;
@@ -204,6 +277,7 @@ export function createFormatting({text, field, stack, format, limit, onError, on
             }
             if (result.text.length > limit) throw new Error(`Text must be no longer than ${limit} characters.`);
             changing = true;
+            if (imageStore && result.text !== before) images = remapImages(before, result.text, images);
             ranges = validateFormat(result.text, result.format);
             text.set_text(result.text);
             previous = result.text;
@@ -247,6 +321,11 @@ export function createFormatting({text, field, stack, format, limit, onError, on
         }
         return Clutter.EVENT_PROPAGATE;
     });
+    let decoratedWidth = -1;
+    field.connect('notify::allocation', () => {
+        const width = imageWidth();
+        if (width !== decoratedWidth) { decoratedWidth = width; refresh(); onChange(); }
+    });
     text.connect('notify::width', scheduleFrames);
     text.connect('notify::height', scheduleFrames);
     text.connect('notify::mapped', scheduleFrames);
@@ -270,7 +349,49 @@ export function createFormatting({text, field, stack, format, limit, onError, on
         ranges = [];
         previous = '';
     });
+    async function receiveImages(source) {
+        if (!imageStore || pending || destroyed) return;
+        flushText();
+        const before = content(); const {start, end} = selection();
+        pending = true;
+        try {
+            const assets = await source();
+            if (destroyed || !assets.length) return;
+            if (content() !== before) throw new Error('Text changed while preparing images. Please insert the image again.');
+            const result = insertImages(before, images, assets, start, end);
+            if (result.text.length > limit) throw new Error(`Text must be no longer than ${limit} characters.`);
+            ranges = remapFormat(before, result.text, ranges, {start, end});
+            // Images inserted inside existing code divide that code into two
+            // frames. Copy controls must never include an attachment marker.
+            ranges = ranges.flatMap(range => {
+                if (range.type !== 'code') return [range];
+                const split = [];let cursor = range.start;
+                for (const image of result.images) {
+                    if (image.offset < cursor || image.offset >= range.end) continue;
+                    if (cursor < image.offset) split.push({...range, start: cursor, end: image.offset});
+                    cursor = image.offset + 1;
+                }
+                if (cursor < range.end) split.push({...range, start: cursor});
+                return split;
+            });
+            images = result.images;changing = true;text.set_text(result.text);previous = result.text;changing = false;
+            refresh();onChange();text.grab_key_focus();text.clutter_text.set_selection(result.cursor, result.cursor);
+        } catch (error) { if (!destroyed) onError(error.message); }
+        finally { pending = false; if (!destroyed) onReady?.(); }
+    }
+    const chooseImages = () => receiveImages(async () => {
+        onChoose?.();
+        const files = await imageStore.chooseFiles();
+        return files.length ? imageStore.importFiles(files) : [];
+    });
+    if (imageStore) text.clutter_text.connect('key-press-event', (_actor, event) => {
+        if (!(event.get_state() & Clutter.ModifierType.CONTROL_MASK) || ![Clutter.KEY_v, Clutter.KEY_V].includes(event.get_key_symbol())) return Clutter.EVENT_PROPAGATE;
+        const type = imageClipboardType();
+        if (!type) return Clutter.EVENT_PROPAGATE;
+        void receiveImages(() => clipboardImages(imageStore, type));
+        return Clutter.EVENT_STOP;
+    });
     refresh();
-    return {toolbar, getFormat: () => { flushText(); return ranges.map(range => ({...range})); },
+    return {toolbar, isPending: () => pending, chooseImages, pasteImages: type => receiveImages(() => clipboardImages(imageStore, type)), getImages: () => {flushText();return images.map(image => ({...image}));}, getFormat: () => { flushText(); return ranges.map(range => ({...range})); },
         setExpanded(value) { expanded = value; toolbar.visible = value; scheduleFrames(); }};
 }

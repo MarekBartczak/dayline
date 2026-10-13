@@ -245,3 +245,12 @@
 .dayline-light.dayline-accent-rose .dayline-entry:focus, .dayline-light.dayline-accent-rose .dayline-textarea:focus, .dayline-light.dayline-accent-rose .dayline-day-today { border-color: #a72c65; }
 .dayline-light.dayline-accent-rose .dayline-task-text-button:hover { color: #a72c65; }
 .dayline-light.dayline-accent-rose .dayline-secondary, .dayline-light.dayline-accent-rose .dayline-chip { background-color: #ffeaf2; color: #a72c65; }
+
+/* Public task images occupy document blocks, never a thumbnail strip. */
+.dayline-image { background-color: #191b24; border: 1px solid #484959; border-radius: 10px; padding: 0px; min-height: 48px; }
+.dayline-image:hover, .dayline-image:focus { border-color: #b79bef; }
+.dayline-image-remove { background-color: rgba(20, 21, 29, 0.85); color: #ffffff; border-radius: 6px; padding: 4px; }
+.dayline-image-remove:hover { background-color: #a13d53; }
+.dayline-image-preview { spacing: 12px; }
+.dayline-task-controls { spacing: 8px; }
+.dayline-light .dayline-image { background-color: #f0f1f5; border-color: #d4d2e0; }

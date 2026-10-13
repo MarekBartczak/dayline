@@ -12,7 +12,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Install GJS and vault cryptography
-        run: sudo apt-get update && sudo apt-get install -y gjs libglib2.0-bin python3-cryptography
+      - name: Install GJS, image decoding and vault cryptography
+        run: sudo apt-get update && sudo apt-get install -y gjs libglib2.0-bin python3-cryptography python3-gi gir1.2-gdkpixbuf-2.0
       - name: Check domain, real storage, encrypted vault and source
         run: bash scripts/check.sh

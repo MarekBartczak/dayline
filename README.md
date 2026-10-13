@@ -2,7 +2,7 @@
 
 Dayline is a native GNOME Shell extension for tasks and notes. The top bar shows how many tasks are in progress and how many are waiting today. Open the panel to plan a day, write a note, or keep instructions beside the app you are working in.
 
-**Version 0.3.1 · GNOME Shell 50 · Local storage · MIT license**
+**Version 0.4.0 · GNOME Shell 50 · Local storage · MIT license**
 
 <table>
   <tr>
@@ -49,6 +49,25 @@ Formatting remains visible in compact and expanded views. The toolbar appears on
   </tr>
 </table>
 
+## Images between paragraphs
+
+Place the cursor where the screenshot belongs and press **Ctrl + V**, or use the image icon in the task editor to choose files. Images become blocks between paragraphs, inside the same task. You can paste screenshot data, photos, or local image files copied from Files. Ordinary text paste keeps its usual behavior.
+
+The preview fills the available width in the task list and both editor sizes. Its height is bounded so a tall screenshot does not stretch the panel; click it to see the complete image. **Back** or **Esc** returns to the task with its unsaved text and pin state intact. The preview also offers **Open original image** for the system image viewer. Use the small × on an image to remove it from the task.
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/images-compact.png" width="340" alt="Compact task editor with a full-width image between text paragraphs"><br><sub>Inline image in the compact editor</sub></td>
+    <td align="center"><img src="docs/screenshots/images-expanded.png" width="480" alt="Expanded task editor with formatting controls and an inline release board screenshot"><br><sub>Text and images in the same task</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/images-task-list.png" width="340" alt="Task card with a full-width image and text underneath"><br><sub>Images stay visible in the list</sub></td>
+    <td align="center"><img src="docs/screenshots/images-preview.png" width="480" alt="Enlarged complete image with Back and Open original controls in the existing Dayline panel"><br><sub>Click to see the complete image</sub></td>
+  </tr>
+</table>
+
+PNG, JPEG, WebP, GIF and BMP are supported. GIF previews show a still frame. A task can hold up to 20 images; each file may be up to 25 MiB, 64 million pixels and 32,768 pixels per side. Originals are copied into Dayline's data folder, so moving the source file does not break the task. Images are available in tasks; Notes and Private keep their text and code editors.
+
 ## Using Dayline
 
 Click the checkmark and counters in the top bar. Type a task in the bottom field and press **Enter**, or click **+**. Today adds it to today's list; Calendar adds it to the selected date. Use Notes for an entry without a date.
@@ -79,10 +98,10 @@ Choose **Light**, **Dark** or **System** appearance in Settings. The six accent 
 
 ## Install
 
-Dayline supports **GNOME Shell 50**. Other Shell versions are not declared compatible. It needs GJS, GTK4/libadwaita for preferences, `glib-compile-schemas`, and system Python 3 with the `cryptography` package for Private notes. On Ubuntu, install the Python dependency with:
+Dayline supports **GNOME Shell 50**. Other Shell versions are not declared compatible. It needs GJS, GTK4/libadwaita for preferences, `glib-compile-schemas`, and system Python 3 with `cryptography` for Private notes and PyGObject/GdkPixbuf for images. On Ubuntu, install these dependencies with:
 
 ```bash
-sudo apt-get install python3-cryptography
+sudo apt-get install python3-cryptography python3-gi gir1.2-gdkpixbuf-2.0
 ```
 
 Install from the repository:
@@ -130,13 +149,25 @@ await (async () => {
 
 Press Enter, then Esc to leave Looking Glass. The updater loads an immutable snapshot with fresh module URLs and can activate a previously disabled Dayline. It preserves stored entries and available session drafts. An open editor blocks switching until you save or close it. No unsafe-mode setting is needed.
 
+### Updating from a checkout
+
+The checkout includes a Looking Glass update helper. It saves a copy of the public document and session drafts, disables Dayline, runs the installer, compares installed files with the immutable runtime, and enables that fresh runtime. The composer, open public editor, date and pin state are restored. Save and close Private before updating.
+
+After pulling the checkout, open Looking Glass with **Alt + F2 → `lg` → Enter** and run this, replacing the checkout path if needed:
+
+```js
+await (await import('file:///home/marek/P_PROJ/dayline/scripts/safe-update.mjs')).update()
+```
+
+Close Looking Glass with **Esc** after it reports `ACTIVE`. This follows disable → change → verify → enable and avoids GNOME's cached extension modules. Recovery copies are stored in the data folder under `pre-update-<timestamp>/`.
+
 ## Storage and backups
 
 Tasks and ordinary notes live in `~/.local/share/dayline/data.json`, or `$XDG_DATA_HOME/dayline/data.json` when that variable is set. This directory is separate from the repository. Disabling, reinstalling or uninstalling Dayline preserves your data.
 
-Each save keeps the previous valid document in `data.json.bak`. Settings offers JSON export and import; import validates the complete file and asks before replacing your entries. If a file cannot be read, Dayline preserves it and blocks edits. Restore a valid JSON backup through preferences; recovery retains a corrupt original as `data.json.corrupt`.
+Each save keeps the previous valid document in `data.json.bak`. Settings exports a ZIP containing public tasks, notes and the original attached images. Import accepts these ZIP backups and older JSON backups, validates the data and asks before replacing your entries. If a file cannot be read, Dayline preserves it and blocks edits. Restore a valid backup through preferences; recovery retains a corrupt original as `data.json.corrupt`.
 
-The JSON document contains `version`, `tasks` and `notes`. Version 2 includes task `inProgress` status; version 1 documents migrate automatically without losing text, IDs, dates or completion status. Formatted entries also have an optional `format` array alongside their plain `text`:
+The public document contains `version`, `tasks` and `notes`. Version 3 adds optional task `images` references alongside text; versions 1 and 2 migrate without losing text, IDs, dates, status or formatting. Formatted entries also have an optional `format` array alongside their plain `text`:
 
 ```json
 {
@@ -147,13 +178,13 @@ The JSON document contains `version`, `tasks` and `notes`. Version 2 includes ta
 
 This is an entry excerpt, not a complete import file. Range types are `bold`, `italic` and `code`; positions count Unicode characters and `end` is exclusive. Plain entries need no conversion. Invalid or unknown formatting is rejected before writing. List prefixes are part of the text itself.
 
-Storage limits are 10,000 entries, 50,000 characters per task, 10,000 per note, and 32 MiB of serialized UTF-8 data. Oversized writes are rejected before changing the current file or its backup. The previous file is backed up byte for byte on the next save.
+Storage limits are 10,000 entries, 50,000 characters per task, 10,000 per note, and 32 MiB of serialized UTF-8 data. Oversized writes are rejected before changing the current file or its backup. The previous file is backed up byte for byte on the next save. Image originals and normalized previews live under `attachments/<sha256>/` in the data folder. Removing an image reference retains its files so previous backups and deletion Undo continue to work. Portable ZIP backups are limited to 512 MiB and 10,000 distinct images.
 
 ### Private notes
 
 The encrypted vault is separate: `~/.local/share/dayline/private-notes.vault`, or `$XDG_DATA_HOME/dayline/private-notes.vault`. It uses **AES-256-GCM** authenticated encryption with a password-derived scrypt key (`N=131072`, `r=8`, `p=1`). Note text and formatting are both encrypted.
 
-**There is no password recovery.** Keep the password to retain access. Ordinary JSON imports and exports exclude Private notes. Back up the vault by copying `private-notes.vault` separately and keeping its password.
+**There is no password recovery.** Keep the password to retain access. Public ZIP backups and JSON imports exclude Private notes. Back up the vault by copying `private-notes.vault` separately and keeping its password.
 
 Dayline works offline on one local desktop. It has no account, server, network requests, tracking or cross-device synchronization, and no runtime npm dependencies. The interface is in English; your entry text is preserved as written.
 
@@ -175,13 +206,15 @@ DAYLINE_TEST_SCRIPT="$PWD/tests/privateShell.js" bash scripts/test-shell.sh
 DAYLINE_TEST_SCRIPT="$PWD/tests/singlePanel.js" bash scripts/test-shell.sh
 DAYLINE_TEST_SCRIPT="$PWD/tests/pointerInput.js" bash scripts/test-shell.sh
 DAYLINE_TEST_SCRIPT="$PWD/tests/richFormatting.js" bash scripts/test-shell.sh
+DAYLINE_TEST_SCRIPT="$PWD/tests/taskImages.js" bash scripts/test-shell.sh
+DAYLINE_TEST_PINNED=0 DAYLINE_TEST_SCRIPT="$PWD/tests/taskImages.js" bash scripts/test-shell.sh
 DAYLINE_TEST_SCRIPT="$PWD/tests/formatDrafts.js" bash scripts/test-shell.sh
 DAYLINE_TEST_SCRIPT="$PWD/tests/formatPointer.js" bash scripts/test-shell.sh
 DAYLINE_TEST_SCRIPT="$PWD/tests/formatHitArea.js" bash scripts/test-shell.sh
 DAYLINE_TEST_SCRIPT="$PWD/tests/longEditor.js" bash scripts/test-shell.sh
 ```
 
-These run in isolated GNOME sessions with temporary XDG data, settings and runtime directories. They cover Private locking, panel transitions and opacity, real pointer input, mouse-drag selection and formatting after scrolling, code copying, formatted drafts, and long-text scrolling and caret behavior. Repeat the formatting pointer checks with `DAYLINE_TEST_PINNED=0` to test the unpinned panel. They do not use your Dayline data or desktop extension settings.
+These run in isolated GNOME sessions with temporary XDG data, settings and runtime directories. They cover Private locking, panel transitions and opacity, real pointer input, mouse-drag selection and formatting after scrolling, code copying, formatted drafts, and long-text scrolling and caret behavior. Image tests cover actual clipboard data, copied files, the native GTK file picker, preview/back, full-width layout, drafts and persistence. Repeat the formatting pointer checks with `DAYLINE_TEST_PINNED=0` to test the unpinned panel. The Shell runner sets temporary XDG paths before the process starts. The preferences backup test also launches an isolated child and refuses to write if its resolved data or image path falls outside the temporary directory.
 
 Capture the standard screenshot set with:
 
@@ -190,7 +223,7 @@ DAYLINE_SCREENSHOTS="$PWD/docs/screenshots" \
 DAYLINE_TEST_SCRIPT="$PWD/tests/screenshots.js" bash scripts/test-shell.sh
 ```
 
-`model.js` contains portable entry logic; `formatting.js` validates and transforms text ranges; `store.js` handles GIO storage. `vault.js` and `private_vault.py` handle encryption, `ui/` contains native Shell widgets, `extension.js` owns lifecycle, and `prefs.js` provides GTK4/libadwaita preferences. `liveUpdate.js` switches runtimes. The [formatting design](docs/superpowers/specs/2026-10-12-rich-formatting.md) describes the editor and storage choices.
+`model.js` contains portable entry logic; `formatting.js` validates and transforms text ranges; `store.js` handles GIO storage; `images.js` maintains inline image positions, while `imageStore.js` and `image_worker.py` handle originals, normalized previews and ZIP backups. `vault.js` and `private_vault.py` handle encryption, `ui/` contains native Shell widgets, `extension.js` owns lifecycle, and `prefs.js` provides GTK4/libadwaita preferences. `liveUpdate.js` switches runtimes; `scripts/safe-update.mjs` performs the complete disable/install/verify/enable sequence from a checkout. The [formatting design](docs/superpowers/specs/2026-10-12-rich-formatting.md) describes the editor and storage choices.
 
 ## Uninstall
 
@@ -202,3 +235,12 @@ gnome-extensions uninstall dayline@marekbartczak.github.io
 Tasks, ordinary notes and the encrypted vault remain in the data directory. Remove that directory only if you want to erase them.
 
 Dayline is licensed under [MIT](LICENSE).
+
+The inline-image screenshots use a separate synthetic fixture:
+
+```bash
+/usr/bin/python3 tests/imageFixtures.py /tmp/dayline-image-sample.png
+DAYLINE_IMAGE_FIXTURE=/tmp/dayline-image-sample.png \
+DAYLINE_SCREENSHOTS="$PWD/docs/screenshots" \
+DAYLINE_TEST_SCRIPT="$PWD/tests/imageScreenshots.js" bash scripts/test-shell.sh
+```
