@@ -46,11 +46,15 @@ Files: package/install/check scripts, metadata, package.json, README and synthet
 - [x] Package all new runtime modules and worker, version 0.4.0 (10). Run `bash scripts/check.sh`, package/install tests and native regressions; inspect screenshots for full-width image layout.
 - [x] Independent spec and code review; resolve findings and rerun affected tests.
 - [x] Update README with practical inline-image instructions, formats and portable backup behavior; screenshots contain synthetic data only.
-- [ ] Commit tested changes, integrate into the original repository and push the authorized public repository. Verify CI for the pushed SHA.
-- [ ] Inspect real active editor before disabling; preserve drafts. Disable, install immutable runtime, verify source/schema/data hashes, enable fresh code and verify ACTIVE. Do not deploy to the laptop.
+- [x] Commit tested changes, integrate into the original repository and push the authorized public repository. Verify CI for the pushed SHA.
+- [x] Inspect real active editor before disabling; preserve drafts. Disable, install immutable runtime, verify source/schema/data hashes, enable fresh code and verify ACTIVE. Do not deploy to the laptop.
 
 ## Verification evidence
 
 Domain/model, worker/archive, asynchronous image store, GIO storage, encrypted vault, installer and syntax suites pass. Native task image tests pass pinned and unpinned, including actual GTK file selection and copied-file clipboard. All nine required native formatting/pointer/long-text/Private variants pass. Four image screenshots were captured with synthetic data and visually inspected. Independent domain/spec/quality reviews approved.
 
 A preferences test initially set XDG paths after GI initialization and overwrote the real public data file. The old running extension retained its original tasks; the user executed a guarded memory recovery, which restored all eight tasks and secured the cached document and public drafts separately. The test now uses a child with environment set before startup and refuses writes unless actual Store/ImageStore paths resolve under its temporary root. AGENTS.md records this requirement. The old live extension remains unchanged until the safe updater completes disable → install → hash verification → fresh activation.
+
+## Delivery
+
+Published main commit `b7154cbddf50b4b48387cca2789d9c4a774456ac`; GitHub Checks run 38374310056 passed. The user executed the tested safe updater. Dayline 0.4.0 (10) is ACTIVE from immutable runtime `0.4.0-2a60bbd9d0c2`. All 27 runtime source/asset/schema files match the checkout and installed root. Public task bytes remained unchanged, all eight tasks survived, and the nonempty composer draft was backed up and restored. AI Usage remains ACTIVE. Laptop deployment was not performed.
