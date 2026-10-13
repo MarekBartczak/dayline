@@ -13,7 +13,9 @@ export async function run(){
  const [,before]=old.store.file.load_contents(null);
  const {update}=await import(Gio.File.new_for_path(`${GLib.getenv('DAYLINE_UPGRADE_SOURCE')}/scripts/safe-update.mjs`).get_uri());
  const result=await update(GLib.getenv('DAYLINE_UPGRADE_SOURCE'));
- assert(record.metadata.version===10&&record.stateObj!==old&&record.stateObj.panel,'Fresh v0.4.0 active');
+ const [,metadataBytes]=Gio.File.new_for_path(`${GLib.getenv('DAYLINE_UPGRADE_SOURCE')}/metadata.json`).load_contents(null);
+ const expectedVersion=JSON.parse(new TextDecoder().decode(metadataBytes)).version;
+ assert(record.metadata.version===expectedVersion&&record.stateObj!==old&&record.stateObj.panel,'Fresh release active');
  assert(record.stateObj.panel.pinning.pinned,'Pin restored');assert(record.stateObj.panel.composer.get_text()==='Unsubmitted composer','Composer restored');
  assert(record.stateObj.panel.editor.text.get_text()==='Unsaved editor text','Unsaved editor restored');
  const [,after]=record.stateObj.store.file.load_contents(null);assert(new TextDecoder().decode(before)===new TextDecoder().decode(after),'Installation preserves original bytes');

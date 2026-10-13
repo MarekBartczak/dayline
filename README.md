@@ -2,7 +2,7 @@
 
 Dayline is a native GNOME Shell extension for tasks and notes. The top bar shows how many tasks are in progress and how many are waiting today. Open the panel to plan a day, write a note, or keep instructions beside the app you are working in.
 
-**Version 0.4.0 · GNOME Shell 50 · Local storage · MIT license**
+**Version 0.4.1 · GNOME Shell 50 · Local storage · MIT license**
 
 <table>
   <tr>
@@ -206,6 +206,8 @@ DAYLINE_TEST_SCRIPT="$PWD/tests/privateShell.js" bash scripts/test-shell.sh
 DAYLINE_TEST_SCRIPT="$PWD/tests/singlePanel.js" bash scripts/test-shell.sh
 DAYLINE_TEST_SCRIPT="$PWD/tests/pointerInput.js" bash scripts/test-shell.sh
 DAYLINE_TEST_SCRIPT="$PWD/tests/richFormatting.js" bash scripts/test-shell.sh
+DAYLINE_TEST_SCRIPT="$PWD/tests/editorHitArea.js" bash scripts/test-shell.sh
+DAYLINE_TEST_PINNED=0 DAYLINE_TEST_SCRIPT="$PWD/tests/editorHitArea.js" bash scripts/test-shell.sh
 DAYLINE_TEST_SCRIPT="$PWD/tests/taskImages.js" bash scripts/test-shell.sh
 DAYLINE_TEST_PINNED=0 DAYLINE_TEST_SCRIPT="$PWD/tests/taskImages.js" bash scripts/test-shell.sh
 DAYLINE_TEST_SCRIPT="$PWD/tests/formatDrafts.js" bash scripts/test-shell.sh

@@ -50,6 +50,42 @@ export function editor(kind, item, initialText, initialDate, data, onSave, onCan
     fieldContent.add_child(stack);
     field.set_child(fieldContent);
     root.add_child(field);
+    field.connect('button-press-event', (_actor, event) => {
+        if (event.get_button() !== 1 || !text.clutter_text.editable)
+            return Clutter.EVENT_PROPAGATE;
+        const ct = text.clutter_text;
+        const source = global.stage.get_event_actor(event);
+        // Glyph clicks keep Clutter's native selection/drag behavior. Image,
+        // code-copy and scrollbar controls own their clicks inside this field.
+        for (let actor = source; actor && actor !== field; actor = actor.get_parent()) {
+            if (actor === ct || actor instanceof St.Button || actor instanceof St.ScrollBar)
+                return Clutter.EVENT_PROPAGATE;
+        }
+        const [stageX, stageY] = event.get_coords();
+        const [valid, x, y] = ct.transform_stage_point(stageX, stageY);
+        if (!valid) return Clutter.EVENT_PROPAGATE;
+        const characters = Array.from(text.get_text());
+        let position;
+        if (y < 0) position = 0;
+        else if (y >= ct.height) position = characters.length;
+        else {
+            // coords_to_position uses UTF-8 bytes; selection uses characters.
+            const index = ct.coords_to_position(x, y);
+            let bytes = 0;
+            position = 0;
+            for (const character of characters) {
+                if (bytes >= index) break;
+                const point = character.codePointAt(0);
+                bytes += point <= 0x7f ? 1 : point <= 0x7ff ? 2 : point <= 0xffff ? 3 : 4;
+                position++;
+            }
+        }
+        const anchor = event.get_state() & Clutter.ModifierType.SHIFT_MASK
+            ? (ct.selection_bound < 0 ? characters.length : ct.selection_bound) : position;
+        text.grab_key_focus();
+        ct.set_selection(position, anchor);
+        return Clutter.EVENT_STOP;
+    });
     let revealSource = 0;
     let measureSource = 0;
     let destroyed = false;
